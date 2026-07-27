@@ -1,0 +1,8 @@
+node_modules
+temp/*
+renders/*
+.env
+.git
+.github
+*.mp4
+*.log

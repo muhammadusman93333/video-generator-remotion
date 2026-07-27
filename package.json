@@ -1,0 +1,29 @@
+{
+  "name": "video_generator_remotion",
+  "version": "1.0.0",
+  "description": "UPOS Automated Short Video Generator using Remotion",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "preview": "remotion preview src/index.ts",
+    "tts": "node scripts/generate-azure-tts.js",
+    "generate:test": "node -e \"fetch('http://localhost:3000/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_url:'https://uvisionpk.com/upload_media_api/uploads/generated_post_image.jpeg',script:'Kya aap thak chuke hain manual billing se? UPOS offers automated invoicing.',prompt:'POS promo'})}).then(r=>r.json()).then(console.log).catch(console.error)\""
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.0",
+    "@remotion/cli": "^4.0.190",
+    "@remotion/google-fonts": "4.0.499",
+    "@remotion/media-utils": "^4.0.190",
+    "axios": "^1.7.2",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.190"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "typescript": "^5.4.5"
+  }
+}
