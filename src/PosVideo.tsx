@@ -148,8 +148,7 @@ const BrandHeader: React.FC = () => {
           fontSize: 42,
           fontWeight: 800,
           letterSpacing: 1,
-        }}
-      >
+        }}>
         UPOS
       </Interactive.Div>
     </Interactive.Div>
@@ -183,8 +182,7 @@ const HeroImage: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
           extrapolateRight: "clamp",
           easing: ease,
         }),
-      }}
-    >
+      }}>
       <Img
         src={imageUrl}
         style={{

@@ -281,7 +281,7 @@ app.post("/generate", async (req, res) => {
     const outPath = finalVideo.replace(/\\/g, "/");
 
     await runCommand(
-      `npx remotion render src/index.ts ${composition} "${outPath}" --duration=${totalFrames} --props="${propsPath}"`
+      `npx remotion render src/index.ts ${composition} "${outPath}" --duration=${totalFrames} --props="${propsPath}" --concurrency=1 --browser-flags="--disable-dev-shm-usage --no-sandbox --disable-gpu"`
     );
 
     // Keep audio/image briefly available is no longer needed after render
