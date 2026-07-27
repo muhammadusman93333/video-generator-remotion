@@ -138,6 +138,7 @@ const BrandHeader: React.FC = () => {
           borderRadius: 22,
           objectFit: "cover",
           boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
+          rotate: "8.1deg"
         }}
       />
       <Interactive.Div
