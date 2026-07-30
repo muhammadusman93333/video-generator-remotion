@@ -44,7 +44,7 @@ jobs:
             libdbus-1-3 \
             libatk1.0-0 \
             libgbm-dev \
-            libasound2 \
+            libasound2t64 \
             libxrandr2 \
             libxkbcommon-dev \
             libxfixes3 \
