@@ -1,0 +1,39 @@
+name: AI Coding Agent
+
+on:
+  repository_dispatch:
+    types: [modify_template]
+
+jobs:
+  modify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Use Personal Access Token to allow triggering other workflows on push
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run AI Coder Script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AI_PROMPT: ${{ github.event.client_payload.prompt }}
+        run: node scripts/ai-coder.js
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/PosVideo.tsx
+          git commit -m "style: AI automated layout update - ${{ github.event.client_payload.prompt }}" || echo "No changes to commit"
+          git push origin main
