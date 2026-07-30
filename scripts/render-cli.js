@@ -227,6 +227,47 @@ async function main() {
   const propsFile = path.join(tempDir, `${uniqueId}_props.json`);
   const finalVideo = path.join(renderDir, `video_${uniqueId}.mp4`);
 
+  // Start a local HTTP server to serve the assets to Puppeteer/Remotion
+  const http = require("http");
+  const server = http.createServer((req, res) => {
+    const urlPath = decodeURIComponent(req.url.split("?")[0]);
+    let filePath = "";
+    
+    if (urlPath.startsWith("/temp/")) {
+      filePath = path.join(tempDir, urlPath.substring(6));
+    } else if (urlPath.startsWith("/public/")) {
+      filePath = path.join(__dirname, "..", "public", urlPath.substring(8));
+    } else {
+      filePath = path.join(__dirname, "..", urlPath);
+    }
+
+    fs.stat(filePath, (err, stats) => {
+      if (err || !stats.isFile()) {
+        res.statusCode = 404;
+        res.end("Not Found");
+        return;
+      }
+
+      res.statusCode = 200;
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+
+      if (filePath.endsWith(".mp3")) {
+        res.setHeader("Content-Type", "audio/mpeg");
+      } else if (filePath.endsWith(".jpeg") || filePath.endsWith(".jpg")) {
+        res.setHeader("Content-Type", "image/jpeg");
+      } else {
+        res.setHeader("Content-Type", "application/octet-stream");
+      }
+
+      fs.createReadStream(filePath).pipe(res);
+    });
+  });
+
+  const PORT = 3000;
+  await new Promise((resolve) => server.listen(PORT, resolve));
+  console.log(`Local assets server running at http://localhost:${PORT}`);
+
   try {
     console.log("Downloading image...");
     await downloadFile(IMAGE_URL, localImage);
@@ -234,14 +275,16 @@ async function main() {
     console.log("Generating Azure TTS...");
     await generateAzureTts(SCRIPT, localAudio);
 
-    const durationSec = await getAudioDuration(localAudio);
+    // Use local server port for duration query
+    const localAudioUrl = `http://localhost:${PORT}/temp/${uniqueId}_voice.mp3`;
+    const durationSec = await getAudioDuration(localAudio); // ffprobe can read file directly
     const totalFrames = Math.max(90, Math.round((durationSec + 1.2) * 30));
 
-    // For local files referenced inside props, we can reference them directly by absolute file URL
+    // Map local files to HTTP localhost URLs for Puppeteer/Chrome to fetch successfully
     const props = {
-      imageUrl: `file:///${localImage.replace(/\\/g, "/")}`,
-      audioUrl: `file:///${localAudio.replace(/\\/g, "/")}`,
-      backgroundMusicUrl: BACKGROUND_MUSIC_URL || `file:///${path.join(__dirname, "..", "public", "background-music.mp3").replace(/\\/g, "/")}`,
+      imageUrl: `http://localhost:${PORT}/temp/${uniqueId}.jpeg`,
+      audioUrl: localAudioUrl,
+      backgroundMusicUrl: BACKGROUND_MUSIC_URL || `http://localhost:${PORT}/public/background-music.mp3`,
       text: SCRIPT,
       prompt: ""
     };
@@ -257,6 +300,9 @@ async function main() {
     );
 
     console.log("Render completed successfully!");
+
+    // Close the assets server
+    server.close();
 
     // Upload video to transient host
     const videoUrl = await uploadToTmpFiles(finalVideo);
@@ -276,6 +322,13 @@ async function main() {
     console.log("Process complete.");
   } catch (error) {
     console.error("Execution failed:", error);
+    server.close();
+    try {
+      fs.unlinkSync(localImage);
+      fs.unlinkSync(localAudio);
+      fs.unlinkSync(propsFile);
+      fs.unlinkSync(finalVideo);
+    } catch (_) {}
     process.exit(1);
   }
 }
