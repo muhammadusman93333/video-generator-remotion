@@ -6,10 +6,25 @@ import {
   calculatePosVideoMetadata,
   posVideoDefaultProps,
 } from "./PosVideo";
+import {
+  SocialPromoVideo,
+  calculateSocialPromoVideoMetadata,
+  socialPromoVideoDefaultProps,
+} from "./SocialPromoVideo";
 
 export const Root: React.FC = () => {
   return (
     <>
+      <Composition
+        id="SocialPromoVideo"
+        component={SocialPromoVideo}
+        durationInFrames={360}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={socialPromoVideoDefaultProps}
+        calculateMetadata={calculateSocialPromoVideoMetadata}
+      />
       <Composition
         id="PosVideo"
         component={PosVideo}

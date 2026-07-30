@@ -9,14 +9,14 @@ import {
   CanvasImage,
 } from "remotion";
 
-interface Props {
-  imageUrl: string;
+export interface MainVideoProps {
+  imageUrl?: string;
   audioUrl?: string;
   backgroundMusicUrl?: string;
-  text: string;
+  text?: string;
 }
 
-export const MainVideo: React.FC<Props> = ({ imageUrl, audioUrl, backgroundMusicUrl, text }) => {
+export const MainVideo: React.FC<MainVideoProps> = ({ imageUrl = "", audioUrl, backgroundMusicUrl, text = "" }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
