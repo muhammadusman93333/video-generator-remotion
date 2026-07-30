@@ -147,14 +147,15 @@ function runCommand(command) {
   });
 }
 
-async function uploadToTmpFiles(filePath) {
-  console.log("Uploading video to tmpfiles.org...");
+async function uploadVideo(filePath) {
+  const uploadUrl = process.env.UPLOAD_SERVER_URL || "https://uvisionpk.com/upload_media_api/upload_video.php";
+  console.log(`Uploading video to ${uploadUrl}...`);
   const FormData = require("form-data");
   const form = new FormData();
-  form.append("file", fs.createReadStream(filePath));
+  form.append("video", fs.createReadStream(filePath));
 
   return new Promise((resolve, reject) => {
-    form.submit("https://tmpfiles.org/api/v1/upload", (err, res) => {
+    form.submit(uploadUrl, (err, res) => {
       if (err) return reject(err);
 
       let body = "";
@@ -162,10 +163,8 @@ async function uploadToTmpFiles(filePath) {
       res.on("end", () => {
         try {
           const json = JSON.parse(body);
-          if (json.status === "success" && json.data && json.data.url) {
-            // Convert viewer URL to direct download URL
-            const downloadUrl = json.data.url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/");
-            resolve(downloadUrl);
+          if (json.status === "success" && json.url) {
+            resolve(json.url);
           } else {
             reject(new Error(`Upload failed: ${body}`));
           }
@@ -305,7 +304,7 @@ async function main() {
     server.close();
 
     // Upload video to transient host
-    const videoUrl = await uploadToTmpFiles(finalVideo);
+    const videoUrl = await uploadVideo(finalVideo);
     console.log(`Video available at: ${videoUrl}`);
 
     // Send Webhook callback
