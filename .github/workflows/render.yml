@@ -1,6 +1,8 @@
 name: Render Remotion Video
 
 on:
+  push:
+    branches: [ main ]
   repository_dispatch:
     types: [render_video]
   workflow_dispatch:
@@ -64,8 +66,8 @@ jobs:
 
       - name: Run Remotion Video Renderer
         env:
-          IMAGE_URL: ${{ github.event.client_payload.image_url || inputs.image_url }}
-          SCRIPT: ${{ github.event.client_payload.script || inputs.script }}
+          IMAGE_URL: ${{ github.event.client_payload.image_url || inputs.image_url || 'https://uvisionpk.com/upload_media_api/uploads/generated_post_image.jpeg' }}
+          SCRIPT: ${{ github.event.client_payload.script || inputs.script || 'This is a test render triggered automatically by Git push!' }}
           COMPOSITION: ${{ github.event.client_payload.composition || inputs.composition || 'PosVideo' }}
           BACKGROUND_MUSIC_URL: ${{ github.event.client_payload.background_music_url || inputs.background_music_url }}
           WEBHOOK_URL: ${{ github.event.client_payload.webhook_url || inputs.webhook_url }}
