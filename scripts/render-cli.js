@@ -98,16 +98,27 @@ function cleanVoiceText(text) {
     .trim();
 }
 
+function convertCustomTagsToSsml(text) {
+  let escaped = escapeXml(cleanVoiceText(text));
+  escaped = escaped.replace(/\[pause\]/gi, '<break time="600ms" />');
+  escaped = escaped.replace(/\[break\]/gi, '<break time="600ms" />');
+  escaped = escaped.replace(/\[strong\](.*?)\[\/strong\]/gi, '<emphasis level="strong">$1</emphasis>');
+  escaped = escaped.replace(/\[moderate\](.*?)\[\/moderate\]/gi, '<emphasis level="moderate">$1</emphasis>');
+  return escaped;
+}
+
 function generateAzureTts(text, outFile) {
   return new Promise((resolve, reject) => {
     if (!AZURE_SPEECH_KEY) {
       return reject(new Error("Missing AZURE_SPEECH_KEY env variable."));
     }
 
+    const innerContent = convertCustomTagsToSsml(text);
+
     const ssml = `<?xml version="1.0" encoding="UTF-8"?>
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-IN">
   <voice name="${AZURE_VOICE}">
-    <prosody rate="0%" pitch="0%">${escapeXml(cleanVoiceText(text))}</prosody>
+    <prosody rate="0%" pitch="0%">${innerContent}</prosody>
   </voice>
 </speak>`;
 
