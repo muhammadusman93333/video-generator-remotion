@@ -241,6 +241,23 @@ function safeUnlink(...files) {
   }
 }
 
+function cleanOldTempFiles() {
+  try {
+    const files = fs.readdirSync(tempDir);
+    const now = Date.now();
+    const maxAgeMs = 15 * 60 * 1000; // 15 minutes max age
+
+    for (const file of files) {
+      if (file.startsWith("pos-")) continue;
+      const filePath = path.join(tempDir, file);
+      const stat = fs.statSync(filePath);
+      if (stat.isFile() && (now - stat.mtimeMs > maxAgeMs)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  } catch (_) {}
+}
+
 function generateRandomLayoutStyle() {
   const shapes = ["circle", "hexagon", "card3d", "diagonal", "blob", "squircle"];
   const animations = ["spring", "fade", "glitch", "slideLeft", "slideRight"];
@@ -279,14 +296,14 @@ app.get("/health", (_req, res) => {
  * { "status": "success", "url": "https://host/renders/video_xxx.mp4", ... }
  */
 app.post("/generate", async (req, res) => {
+  cleanOldTempFiles();
   const imageUrl = req.body.image_url || req.body.imageUrl;
   const script =
     req.body.script || req.body.text || req.body.voiceover_script || req.body.voiceoverScript;
   const prompt = req.body.prompt || "";
-  let composition = req.body.composition || "random";
-  if (composition === "random" || composition === "IndustryVideo") {
-    const randomId = Math.floor(Math.random() * 6) + 1;
-    composition = `IndustryVideoV${randomId}`;
+  let composition = req.body.composition || "IndustryVideo";
+  if (composition === "random") {
+    composition = "IndustryVideo";
   }
 
   const hookText = req.body.hookText || req.body.hook || "";
@@ -400,12 +417,12 @@ app.post("/generate", async (req, res) => {
  * Restaurant Video Generation endpoint
  */
 app.post("/generate/restaurant", async (req, res) => {
+  cleanOldTempFiles();
   const imageUrl = req.body.image_url || req.body.imageUrl;
   const script =
     req.body.script || req.body.text || req.body.voiceover_script || req.body.voiceoverScript;
   const prompt = req.body.prompt || "";
-  const randomId = Math.floor(Math.random() * 6) + 1;
-  const composition = `IndustryVideoV${randomId}`;
+  const composition = "IndustryVideo";
 
   const hookText = req.body.hookText || req.body.hook || "";
   const bodyText = req.body.bodyText || req.body.body || "";
@@ -529,6 +546,7 @@ app.post("/generate/restaurant", async (req, res) => {
  * { "status": "success", "url": "https://host/temp/tts_xxx_voice.mp3", ... }
  */
 app.post("/tts", async (req, res) => {
+  cleanOldTempFiles();
   const text = req.body.text || req.body.script;
   if (!text) {
     return res.status(400).json({

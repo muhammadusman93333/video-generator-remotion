@@ -8,10 +8,9 @@ const ffprobeInstaller = require("@ffprobe-installer/ffprobe");
 // Parse inputs from Env
 const IMAGE_URL = process.env.IMAGE_URL;
 const SCRIPT = process.env.SCRIPT || process.env.TEXT;
-let COMPOSITION = process.env.COMPOSITION || "random";
-if (COMPOSITION === "random" || COMPOSITION === "IndustryVideo") {
-  const randomId = Math.floor(Math.random() * 6) + 1;
-  COMPOSITION = `IndustryVideoV${randomId}`;
+let COMPOSITION = process.env.COMPOSITION || "IndustryVideo";
+if (COMPOSITION === "random") {
+  COMPOSITION = "IndustryVideo";
 }
 const BACKGROUND_MUSIC_URL = process.env.BACKGROUND_MUSIC_URL;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
@@ -199,28 +198,47 @@ async function sendWebhook(videoUrl) {
     script: SCRIPT
   });
 
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(WEBHOOK_URL);
-    const req = https.request({
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(data)
+  return new Promise((resolve) => {
+    function makeRequest(targetUrl, depth = 0) {
+      if (depth > 3) {
+        console.error("Webhook redirect depth exceeded.");
+        return resolve();
       }
-    }, (res) => {
-      console.log(`Webhook response status: ${res.statusCode}`);
-      resolve();
-    });
+      try {
+        const urlObj = new URL(targetUrl);
+        const req = https.request({
+          hostname: urlObj.hostname,
+          path: urlObj.pathname + (urlObj.search || ""),
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(data),
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          }
+        }, (res) => {
+          console.log(`Webhook response status: ${res.statusCode}`);
+          if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) && res.headers.location) {
+            console.log(`Following redirect to: ${res.headers.location}`);
+            makeRequest(res.headers.location, depth + 1);
+          } else {
+            resolve();
+          }
+        });
 
-    req.on("error", (e) => {
-      console.error("Failed to send webhook:", e);
-      resolve(); // Do not throw to avoid crashing workflow if webhook is slow/unstable
-    });
+        req.on("error", (e) => {
+          console.error("Failed to send webhook:", e);
+          resolve();
+        });
 
-    req.write(data);
-    req.end();
+        req.write(data);
+        req.end();
+      } catch (err) {
+        console.error("Webhook URL parsing error:", err);
+        resolve();
+      }
+    }
+
+    makeRequest(WEBHOOK_URL);
   });
 }
 
