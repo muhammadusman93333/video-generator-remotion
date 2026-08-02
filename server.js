@@ -38,7 +38,7 @@ app.use((req, res, next) => {
 });
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
-const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
+const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-ArjunNeural";
 
 app.use(express.json({ limit: "2mb" }));
 app.use("/renders", express.static(path.join(__dirname, "renders")));
@@ -127,7 +127,18 @@ function cleanVoiceText(text) {
     .trim();
 }
 
-function generateAzureTts(text, outFile) {
+function convertCustomTagsToSsml(text) {
+  let escaped = escapeXml(cleanVoiceText(text));
+  // Convert [pause] or [break] into SSML break tags
+  escaped = escaped.replace(/\[pause\]/gi, '<break time="600ms" />');
+  escaped = escaped.replace(/\[break\]/gi, '<break time="600ms" />');
+  // Convert [strong]...[/strong] into SSML emphasis tags
+  escaped = escaped.replace(/\[strong\](.*?)\[\/strong\]/gi, '<emphasis level="strong">$1</emphasis>');
+  escaped = escaped.replace(/\[moderate\](.*?)\[\/moderate\]/gi, '<emphasis level="moderate">$1</emphasis>');
+  return escaped;
+}
+
+function generateAzureTts(text, outFile, options = {}) {
   return new Promise((resolve, reject) => {
     if (!AZURE_SPEECH_KEY) {
       return reject(
@@ -135,12 +146,34 @@ function generateAzureTts(text, outFile) {
       );
     }
 
-    const ssml = `<?xml version="1.0" encoding="UTF-8"?>
-<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-IN">
-  <voice name="${AZURE_VOICE}">
-    <prosody rate="0%" pitch="0%">${escapeXml(cleanVoiceText(text))}</prosody>
+    const voice = options.voice || AZURE_VOICE;
+    const rate = options.rate || "0%";
+    const pitch = options.pitch || "0%";
+    const style = options.style || "";
+
+    // Determine language code from voice name, e.g. "en-IN-NeerjaNeural" -> "en-IN"
+    const lang = voice.split("-").slice(0, 2).join("-") || "en-US";
+
+    const innerContent = convertCustomTagsToSsml(text);
+
+    let ssml = "";
+    if (style) {
+      ssml = `<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="${lang}">
+  <voice name="${voice}">
+    <mstts:express-as style="${style}">
+      <prosody rate="${rate}" pitch="${pitch}">${innerContent}</prosody>
+    </mstts:express-as>
   </voice>
 </speak>`;
+    } else {
+      ssml = `<?xml version="1.0" encoding="UTF-8"?>
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}">
+  <voice name="${voice}">
+    <prosody rate="${rate}" pitch="${pitch}">${innerContent}</prosody>
+  </voice>
+</speak>`;
+    }
 
     const req = https.request(
       {
@@ -208,6 +241,20 @@ function safeUnlink(...files) {
   }
 }
 
+function generateRandomLayoutStyle() {
+  const shapes = ["circle", "hexagon", "card3d", "diagonal", "blob", "squircle"];
+  const animations = ["spring", "fade", "glitch", "slideLeft", "slideRight"];
+  const glows = ["neon", "metallic", "glass", "none"];
+  const fonts = ["outfit", "lilita", "poppins", "inter"];
+
+  return {
+    frameShape: shapes[Math.floor(Math.random() * shapes.length)],
+    animationStyle: animations[Math.floor(Math.random() * animations.length)],
+    borderGlow: glows[Math.floor(Math.random() * glows.length)],
+    fontPair: fonts[Math.floor(Math.random() * fonts.length)],
+  };
+}
+
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -234,16 +281,23 @@ app.get("/health", (_req, res) => {
 app.post("/generate", async (req, res) => {
   const imageUrl = req.body.image_url || req.body.imageUrl;
   const script =
-    req.body.script || req.body.text || req.body.voiceover_script;
+    req.body.script || req.body.text || req.body.voiceover_script || req.body.voiceoverScript;
   const prompt = req.body.prompt || "";
-  const composition =
-    req.body.composition === "MainVideo" ? "MainVideo" : "PosVideo";
+  let composition = req.body.composition || "random";
+  if (composition === "random" || composition === "IndustryVideo") {
+    const randomId = Math.floor(Math.random() * 6) + 1;
+    composition = `IndustryVideoV${randomId}`;
+  }
+
+  const hookText = req.body.hookText || req.body.hook || "";
+  const bodyText = req.body.bodyText || req.body.body || "";
+  const themeColor = req.body.themeColor || req.body.theme_color || "";
 
   if (!imageUrl || !script) {
     return res.status(400).json({
       status: "error",
       message:
-        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: prompt, composition, background_music_url",
+        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: prompt, composition, background_music_url, hookText, bodyText, themeColor",
     });
   }
 
@@ -258,8 +312,25 @@ app.post("/generate", async (req, res) => {
     console.log(`[${uniqueId}] Downloading image...`);
     await downloadFile(imageUrl, localImage);
 
+    const voice = req.body.voice || AZURE_VOICE;
+    const style = req.body.style || req.body.tone || "";
+    let rate = req.body.rate || req.body.speed;
+    if (rate === undefined) {
+      rate = "+5%";
+    } else if (typeof rate === "number") {
+      const percent = Math.round((rate - 1) * 100);
+      rate = `${percent >= 0 ? "+" : ""}${percent}%`;
+    }
+    let pitch = req.body.pitch;
+    if (pitch === undefined) {
+      pitch = "-5%";
+    } else if (typeof pitch === "number") {
+      const percent = Math.round(pitch * 100);
+      pitch = `${percent >= 0 ? "+" : ""}${percent}%`;
+    }
+
     console.log(`[${uniqueId}] Generating Azure TTS...`);
-    await generateAzureTts(script, localAudio);
+    await generateAzureTts(script, localAudio, { voice, style, rate, pitch });
 
     const durationSec = await getAudioDuration(localAudio);
     const totalFrames = Math.max(90, Math.round((durationSec + 1.2) * 30));
@@ -268,12 +339,19 @@ app.post("/generate", async (req, res) => {
       req.body.background_music_url ||
       `${baseUrl}/public/background-music.mp3`;
 
+    const layoutStyle = req.body.layoutStyle || req.body.layout_style || generateRandomLayoutStyle();
+
     const props = {
       imageUrl: `${baseUrl}/temp/${uniqueId}.jpeg`,
       audioUrl: `${baseUrl}/temp/${uniqueId}_voice.mp3`,
       backgroundMusicUrl,
       text: script,
       prompt,
+      hookText,
+      bodyText,
+      themeColor,
+      industry: req.body.industry || "",
+      layoutStyle,
     };
 
     fs.writeFileSync(propsFile, JSON.stringify(props));
@@ -285,8 +363,12 @@ app.post("/generate", async (req, res) => {
     const propsPath = propsFile.replace(/\\/g, "/");
     const outPath = finalVideo.replace(/\\/g, "/");
 
+    const concurrency = process.env.REMOTION_CONCURRENCY || "1";
+    const concurrencyFlag = concurrency !== "auto" ? `--concurrency=${concurrency}` : "";
+    const browserFlags = process.env.REMOTION_BROWSER_FLAGS || "--disable-dev-shm-usage --no-sandbox --disable-gpu";
+
     await runCommand(
-      `npx remotion render src/index.ts ${composition} "${outPath}" --duration=${totalFrames} --props="${propsPath}" --concurrency=1 --browser-flags="--disable-dev-shm-usage --no-sandbox --disable-gpu"`
+      `npx remotion render src/index.ts ${composition} "${outPath}" --duration=${totalFrames} --props="${propsPath}" ${concurrencyFlag} --browser-flags="${browserFlags}"`
     );
 
     // Keep audio/image briefly available is no longer needed after render
@@ -314,9 +396,206 @@ app.post("/generate", async (req, res) => {
   }
 });
 
+/**
+ * Restaurant Video Generation endpoint
+ */
+app.post("/generate/restaurant", async (req, res) => {
+  const imageUrl = req.body.image_url || req.body.imageUrl;
+  const script =
+    req.body.script || req.body.text || req.body.voiceover_script || req.body.voiceoverScript;
+  const prompt = req.body.prompt || "";
+  const randomId = Math.floor(Math.random() * 6) + 1;
+  const composition = `IndustryVideoV${randomId}`;
+
+  const hookText = req.body.hookText || req.body.hook || "";
+  const bodyText = req.body.bodyText || req.body.body || "";
+  const themeColor = req.body.themeColor || req.body.theme_color || "";
+
+  if (!imageUrl || !script) {
+    return res.status(400).json({
+      status: "error",
+      message:
+        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: hookText, bodyText, themeColor",
+    });
+  }
+
+  const uniqueId = Math.random().toString(36).substring(7) + "_" + Date.now();
+  const localImage = path.join(tempDir, `${uniqueId}.jpeg`);
+  const localAudio = path.join(tempDir, `${uniqueId}_voice.mp3`);
+  const propsFile = path.join(tempDir, `${uniqueId}_props.json`);
+  const finalVideo = path.join(renderDir, `video_${uniqueId}.mp4`);
+  const baseUrl = getBaseUrl(req);
+
+  try {
+    console.log(`[Restaurant ${uniqueId}] Downloading image...`);
+    await downloadFile(imageUrl, localImage);
+
+    const voice = req.body.voice || AZURE_VOICE;
+    const style = req.body.style || req.body.tone || "";
+    let rate = req.body.rate || req.body.speed;
+    if (rate === undefined) {
+      rate = "+5%";
+    } else if (typeof rate === "number") {
+      const percent = Math.round((rate - 1) * 100);
+      rate = `${percent >= 0 ? "+" : ""}${percent}%`;
+    }
+    let pitch = req.body.pitch;
+    if (pitch === undefined) {
+      pitch = "-5%";
+    } else if (typeof pitch === "number") {
+      const percent = Math.round(pitch * 100);
+      pitch = `${percent >= 0 ? "+" : ""}${percent}%`;
+    }
+
+    console.log(`[Restaurant ${uniqueId}] Generating Azure TTS...`);
+    await generateAzureTts(script, localAudio, { voice, style, rate, pitch });
+
+    const durationSec = await getAudioDuration(localAudio);
+    const totalFrames = Math.max(90, Math.round((durationSec + 1.2) * 30));
+
+    const backgroundMusicUrl =
+      req.body.background_music_url ||
+      `${baseUrl}/public/background-music.mp3`;
+
+    const layoutStyle = req.body.layoutStyle || req.body.layout_style || generateRandomLayoutStyle();
+
+    const props = {
+      imageUrl: `${baseUrl}/temp/${uniqueId}.jpeg`,
+      audioUrl: `${baseUrl}/temp/${uniqueId}_voice.mp3`,
+      backgroundMusicUrl,
+      text: script,
+      prompt,
+      hookText,
+      bodyText,
+      themeColor,
+      industry: "Restaurant",
+      layoutStyle,
+    };
+
+    fs.writeFileSync(propsFile, JSON.stringify(props));
+
+    console.log(
+      `[Restaurant ${uniqueId}] Rendering ${composition} (${totalFrames} frames)...`
+    );
+
+    const propsPath = propsFile.replace(/\\/g, "/");
+    const outPath = finalVideo.replace(/\\/g, "/");
+
+    const concurrency = process.env.REMOTION_CONCURRENCY || "1";
+    const concurrencyFlag = concurrency !== "auto" ? `--concurrency=${concurrency}` : "";
+    const browserFlags = process.env.REMOTION_BROWSER_FLAGS || "--disable-dev-shm-usage --no-sandbox --disable-gpu";
+
+    await runCommand(
+      `npx remotion render src/index.ts ${composition} "${outPath}" --duration=${totalFrames} --props="${propsPath}" ${concurrencyFlag} --browser-flags="${browserFlags}"`
+    );
+
+    safeUnlink(localImage, localAudio, propsFile);
+
+    const videoUrl = `${baseUrl}/renders/video_${uniqueId}.mp4`;
+    console.log(`[Restaurant ${uniqueId}] Done: ${videoUrl}`);
+
+    res.json({
+      status: "success",
+      url: videoUrl,
+      video_url: videoUrl,
+      composition,
+      duration_seconds: durationSec,
+      frames: totalFrames,
+    });
+  } catch (error) {
+    console.error(`[Restaurant ${uniqueId}] Error:`, error);
+    safeUnlink(localImage, localAudio, propsFile);
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+});
+
+
+/**
+ * Text-to-Speech endpoint
+ *
+ * Body JSON:
+ * {
+ *   "text": "Hello world",               // required (alias: script)
+ *   "voice": "en-US-JennyNeural",        // optional
+ *   "style": "cheerful",                 // optional (alias: tone)
+ *   "rate": "0%",                        // optional (alias: speed, can be string like "+10%" or number like 1.1)
+ *   "pitch": "0%"                        // optional (can be string like "+5%" or number like 0.05)
+ * }
+ *
+ * Response:
+ * { "status": "success", "url": "https://host/temp/tts_xxx_voice.mp3", ... }
+ */
+app.post("/tts", async (req, res) => {
+  const text = req.body.text || req.body.script;
+  if (!text) {
+    return res.status(400).json({
+      status: "error",
+      message: "Missing required field: text (or script)",
+    });
+  }
+
+  const voice = req.body.voice || AZURE_VOICE;
+  const style = req.body.style || req.body.tone || "";
+  
+  let rate = req.body.rate || req.body.speed;
+  if (rate === undefined) {
+    rate = "+5%";
+  } else if (typeof rate === "number") {
+    const percent = Math.round((rate - 1) * 100);
+    rate = `${percent >= 0 ? "+" : ""}${percent}%`;
+  }
+
+  let pitch = req.body.pitch;
+  if (pitch === undefined) {
+    pitch = "-5%";
+  } else if (typeof pitch === "number") {
+    const percent = Math.round(pitch * 100);
+    pitch = `${percent >= 0 ? "+" : ""}${percent}%`;
+  }
+
+  const uniqueId = Math.random().toString(36).substring(7) + "_" + Date.now();
+  const localAudio = path.join(tempDir, `tts_${uniqueId}_voice.mp3`);
+  const baseUrl = getBaseUrl(req);
+
+  try {
+    console.log(`[TTS ${uniqueId}] Generating TTS...`);
+    await generateAzureTts(text, localAudio, { voice, style, rate, pitch });
+
+    const durationSec = await getAudioDuration(localAudio);
+    const audioUrl = `${baseUrl}/temp/tts_${uniqueId}_voice.mp3`;
+
+    console.log(`[TTS ${uniqueId}] Done: ${audioUrl}`);
+
+    res.json({
+      status: "success",
+      url: audioUrl,
+      audio_url: audioUrl,
+      duration_seconds: durationSec,
+      parameters: {
+        voice,
+        style,
+        rate,
+        pitch,
+      },
+    });
+  } catch (error) {
+    console.error(`[TTS ${uniqueId}] Error:`, error);
+    safeUnlink(localAudio);
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`Video generator running on http://localhost:${PORT}`);
   console.log(`POST /generate  { image_url, script, prompt? }`);
+  console.log(`POST /tts       { text, voice?, style?, rate?, pitch? }`);
   console.log(`GET  /health`);
   if (!AZURE_SPEECH_KEY) {
     console.warn("WARNING: AZURE_SPEECH_KEY is not set in .env");

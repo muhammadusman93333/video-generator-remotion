@@ -294,8 +294,12 @@ async function main() {
     const propsPath = propsFile.replace(/\\/g, "/");
     const outPath = finalVideo.replace(/\\/g, "/");
 
+    const concurrency = process.env.REMOTION_CONCURRENCY || "1";
+    const concurrencyFlag = concurrency !== "auto" ? `--concurrency=${concurrency}` : "";
+    const browserFlags = process.env.REMOTION_BROWSER_FLAGS || "--disable-dev-shm-usage --no-sandbox --disable-gpu";
+
     await runCommand(
-      `npx remotion render src/index.ts ${COMPOSITION} "${outPath}" --duration=${totalFrames} --props="${propsPath}" --concurrency=1 --browser-flags="--disable-dev-shm-usage --no-sandbox --disable-gpu"`
+      `npx remotion render src/index.ts ${COMPOSITION} "${outPath}" --duration=${totalFrames} --props="${propsPath}" ${concurrencyFlag} --browser-flags="${browserFlags}"`
     );
 
     console.log("Render completed successfully!");

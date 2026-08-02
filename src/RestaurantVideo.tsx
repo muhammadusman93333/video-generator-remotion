@@ -12,44 +12,41 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { loadFont } from "@remotion/google-fonts/Inter";
+import { loadFont } from "@remotion/google-fonts/Outfit";
 import { getAudioDuration } from "./get-audio-duration";
 
 const { fontFamily } = loadFont("normal", {
-  weights: ["500", "700", "800"],
+  weights: ["400", "600", "700", "800", "900"],
   subsets: ["latin"],
 });
 
 const COLORS = {
-  bg: "#0B1F2A",
-  bgMid: "#123447",
-  accent: "#2DD4A8",
+  bg: "#0c0906", // Rich coal-dark
+  accentOrange: "#ff5e00", // Vibrant flame orange
+  accentGold: "#ffb700", // Warm gold
   text: "#FFFFFF",
-  muted: "rgba(255, 255, 255, 0.78)",
 };
 
 const ease = Easing.bezier(0.16, 1, 0.3, 1);
 const FPS = 30;
 const END_PADDING_SECONDS = 1.2;
 
-export type PosVideoProps = {
+export type RestaurantVideoProps = {
   imageUrl: string;
   audioUrl: string;
   backgroundMusicUrl: string;
   text: string;
-  /** Flux/image prompt — metadata only. Remotion does not generate visuals from this. */
   prompt?: string;
   hookText?: string;
   bodyText?: string;
   themeColor?: string;
 };
 
-export const posVideoDefaultProps: PosVideoProps = {
-  imageUrl:
-    "https://uvisionpk.com/upload_media_api/uploads/generated_post_image.jpeg",
+export const restaurantVideoDefaultProps: RestaurantVideoProps = {
+  imageUrl: "https://uvisionpk.com/upload_media_api/uploads/generated_post_image.jpeg",
   audioUrl: staticFile("voiceover/pos-video.mp3"),
   backgroundMusicUrl: staticFile("background-music.mp3"),
-  text: "Kya aap thak chuke hain manual billing se?\nUPOS offers automated invoicing that saves you hours of stock tallying time every day at closing time!",
+  text: "Restaurant billing me deri? [pause] U POS lagayein aur orders ko super-fast kitchen tak pahunchayein!",
   prompt: "",
   hookText: "",
   bodyText: "",
@@ -68,26 +65,29 @@ const cleanDisplayLines = (text: string) =>
       return true;
     });
 
-export const calculatePosVideoMetadata: CalculateMetadataFunction<
-  PosVideoProps
+export const calculateRestaurantVideoMetadata: CalculateMetadataFunction<
+  RestaurantVideoProps
 > = async ({ props }) => {
   if (!props.audioUrl) {
     return { durationInFrames: 360 };
   }
-
-  const durationInSeconds = await getAudioDuration(props.audioUrl);
-  return {
-    durationInFrames: Math.max(
-      90,
-      Math.ceil((durationInSeconds + END_PADDING_SECONDS) * FPS)
-    ),
-  };
+  try {
+    const durationInSeconds = await getAudioDuration(props.audioUrl);
+    return {
+      durationInFrames: Math.max(
+        90,
+        Math.ceil((durationInSeconds + END_PADDING_SECONDS) * FPS)
+      ),
+    };
+  } catch (_) {
+    return { durationInFrames: 360 };
+  }
 };
 
 const Background: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  const scale = interpolate(frame, [0, durationInFrames], [1.05, 1.18], {
+  const scale = interpolate(frame, [0, durationInFrames], [1.05, 1.15], {
     extrapolateRight: "clamp",
   });
 
@@ -99,121 +99,41 @@ const Background: React.FC<{ imageUrl: string }> = ({ imageUrl }) => {
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          filter: "blur(28px) brightness(0.35)",
+          filter: "brightness(0.2) contrast(1.1)",
           scale,
-        }}
-      />
+        }} />
       <AbsoluteFill
         style={{
-          background:
-            "linear-gradient(180deg, rgba(11,31,42,0.55) 0%, rgba(11,31,42,0.78) 100%)",
+          background: "linear-gradient(180deg, rgba(12,9,6,0.5) 0%, rgba(12,9,6,0.9) 100%)",
         }}
       />
     </AbsoluteFill>
   );
 };
 
-const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
+const Ember: React.FC<{ index: number; color: string }> = ({ index, color }) => {
   const frame = useCurrentFrame();
-
-  return (
-    <Interactive.Div
-      name="Brand header"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 12,
-        opacity: interpolate(frame, [0, 18], [0, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-          easing: ease,
-        }),
-        translate: interpolate(frame, [0, 18], ["0px -20px", "0px 0px"], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-          easing: ease,
-        }),
-      }}
-    >
-      <Img
-        src={staticFile("final uvision icon.jpg")}
-        style={{
-          width: 96,
-          height: 96,
-          borderRadius: 22,
-          objectFit: "cover",
-          boxShadow: "0 16px 40px rgba(0,0,0,0.4)",
-          border: `2px solid ${accentColor}`,
-          rotate: "8.1deg"
-        }}
-      />
-      <Interactive.Div
-        name="UPOS label"
-        style={{
-          color: COLORS.text,
-          fontSize: 42,
-          fontWeight: 800,
-          letterSpacing: 1,
-        }}>
-        UPOS
-      </Interactive.Div>
-    </Interactive.Div>
-  );
-};
-
-const GlowOrb: React.FC<{ accentColor: string }> = ({ accentColor }) => {
-  const frame = useCurrentFrame();
-  const pulse = Math.sin(frame * 0.05) * 0.08 + 1.0; // scales from 0.92 to 1.08
-  const opacity = Math.sin(frame * 0.04) * 0.08 + 0.32; // opacity fluctuates slightly
-  
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: "50%",
-        top: "46%",
-        transform: `translate(-50%, -50%) scale(${pulse})`,
-        width: 900,
-        height: 900,
-        borderRadius: "50%",
-        background: `radial-gradient(circle, ${accentColor} 0%, rgba(0,0,0,0) 70%)`,
-        opacity,
-        filter: "blur(60px)",
-        pointerEvents: "none",
-        zIndex: 0,
-      }}
-    />
-  );
-};
-
-const Particle: React.FC<{ index: number; accentColor: string }> = ({ index, accentColor }) => {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
-  
-  // Deterministic values based on particle index
   const random = (seed: number) => {
-    const x = Math.sin(index * 432.12 + seed * 97.45) * 8543;
+    const x = Math.sin(index * 323.4 + seed * 45.2) * 8721;
     return x - Math.floor(x);
   };
-  
-  const size = Math.round(random(1) * 12 + 6); // 6 to 18px
-  const startX = random(2) * 1080; // horizontal layout bounds
-  const speed = random(3) * 1.6 + 0.8; // speed of float
-  const swayRange = random(4) * 50 + 20; 
-  const swaySpeed = random(5) * 0.04 + 0.015;
-  
-  // Floating up animation
-  const startY = 1920 + (index * 130);
+
+  const size = Math.round(random(1) * 10 + 4); // 4 to 14px
+  const startX = random(2) * 1080;
+  const speed = random(3) * 2.2 + 1.2; // float speed
+  const swayRange = random(4) * 60 + 30;
+  const swaySpeed = random(5) * 0.035 + 0.015;
+
+  const startY = 1920 + (index * 120);
   const currentY = startY - (frame * speed);
   const y = ((currentY + 100) % (1920 + 200)) - 100;
   const x = startX + Math.sin(frame * swaySpeed) * swayRange;
-  
-  const opacity = interpolate(y, [0, 200, 1720, 1920], [0, 0.45, 0.45, 0], {
+
+  const opacity = interpolate(y, [0, 300, 1600, 1920], [0, 0.7, 0.7, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  
+
   return (
     <div
       style={{
@@ -223,53 +143,135 @@ const Particle: React.FC<{ index: number; accentColor: string }> = ({ index, acc
         width: size,
         height: size,
         borderRadius: "50%",
-        backgroundColor: accentColor,
+        backgroundColor: color,
         opacity,
-        filter: "blur(1.5px)",
+        boxShadow: `0 0 10px ${color}, 0 0 20px ${color}`,
+        filter: "blur(0.8px)",
         pointerEvents: "none",
-        zIndex: 0,
       }}
     />
   );
 };
 
-const HeroImage: React.FC<{ imageUrl: string; accentColor: string }> = ({ imageUrl, accentColor }) => {
+const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
+  const frame = useCurrentFrame();
+  
+  // Sweep shine effect
+  const shineTranslate = interpolate(frame % 90, [0, 30], [-150, 150], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <Interactive.Div
+      name="Brand header"
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 16,
+        opacity: interpolate(frame, [0, 15], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: ease,
+        }),
+      }}
+    >
+      <div
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 20,
+          overflow: "hidden",
+          position: "relative",
+          boxShadow: `0 10px 25px rgba(0,0,0,0.5), 0 0 15px ${accentColor}33`,
+          border: `2px solid ${accentColor}`,
+        }}
+      >
+        <Img
+          src={staticFile("UPOS logo.png")}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        {/* Shine Overlay */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: 40,
+            height: "100%",
+            background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%)",
+            transform: `skewX(-25deg) translateX(${shineTranslate}px)`,
+          }}
+        />
+      </div>
+      <Interactive.Div
+        name="UPOS label"
+        style={{
+          color: COLORS.text,
+          fontSize: 38,
+          fontWeight: 900,
+          letterSpacing: 2,
+        }}
+      >
+        UPOS
+      </Interactive.Div>
+    </Interactive.Div>
+  );
+};
+
+const RestaurantHero: React.FC<{ imageUrl: string; accentColor: string }> = ({ imageUrl, accentColor }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  const scale = interpolate(frame, [0, durationInFrames], [1, 1.12], {
+
+  const scale = interpolate(frame, [0, durationInFrames], [1, 1.14], {
     extrapolateRight: "clamp",
   });
   
-  // Gentle sways (3D perspective floating effect)
-  const rotateX = Math.sin(frame * 0.045) * 4.0;
-  const rotateY = Math.cos(frame * 0.035) * 5.0;
-  const translateY = Math.sin(frame * 0.05) * 12;
-  
+  // Rotating border effect
+  const borderRotate = frame * 1.8;
+  const floatY = Math.sin(frame * 0.05) * 15;
+  const swayX = Math.cos(frame * 0.04) * 8;
+
   return (
     <Interactive.Div
-      name="Hero image container"
+      name="Hero container"
       style={{
         position: "relative",
-        perspective: 1200,
-        zIndex: 2,
+        width: 860,
+        height: 860,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transform: `translate(${swayX}px, ${floatY}px)`,
       }}
     >
-      <Interactive.Div
-        name="Hero image 3D"
+      {/* Neon/Gold Ring Background */}
+      <div
         style={{
-          width: 860,
-          height: 860,
-          borderRadius: 36,
+          position: "absolute",
+          width: 840,
+          height: 840,
+          borderRadius: "50%",
+          border: "4px dashed transparent",
+          backgroundImage: `linear-gradient(${accentColor}, ${COLORS.accentGold}, ${accentColor})`,
+          backgroundOrigin: "border-box",
+          boxShadow: `0 0 40px ${accentColor}55, inset 0 0 40px ${accentColor}22`,
+          transform: `rotate(${borderRotate}deg)`,
+          opacity: 0.85,
+        }}
+      />
+      
+      {/* Circle Crop Image Container */}
+      <div
+        style={{
+          width: 800,
+          height: 800,
+          borderRadius: "50%",
           overflow: "hidden",
-          border: `3px solid ${accentColor}66`,
-          boxShadow: `0 35px 80px rgba(0,0,0,0.65), 0 0 50px ${accentColor}22`,
-          opacity: interpolate(frame, [8, 28], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: ease,
-          }),
-          transform: `translateY(${translateY}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-          transformStyle: "preserve-3d",
+          border: `6px solid #14110e`,
+          boxShadow: "0 25px 55px rgba(0,0,0,0.7)",
+          zIndex: 2,
         }}
       >
         <Img
@@ -279,10 +281,9 @@ const HeroImage: React.FC<{ imageUrl: string; accentColor: string }> = ({ imageU
             height: "100%",
             objectFit: "cover",
             scale,
-            translate: "-36.9px -138.5px"
           }}
         />
-      </Interactive.Div>
+      </div>
     </Interactive.Div>
   );
 };
@@ -294,7 +295,7 @@ const parseRichText = (text: string, accentColor: string) => {
     if (part.startsWith("[strong]") && part.endsWith("[/strong]")) {
       const content = part.slice(8, -9);
       return (
-        <span key={index} style={{ color: accentColor, fontWeight: 900 }}>
+        <span key={index} style={{ color: accentColor, fontWeight: 900, textShadow: `0 0 10px ${accentColor}44` }}>
           {content}
         </span>
       );
@@ -306,12 +307,12 @@ const parseRichText = (text: string, accentColor: string) => {
 const Subtitles: React.FC<{ lines: string[]; accentColor: string }> = ({ lines, accentColor }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  
+
   if (lines.length === 0) return null;
-  
+
   const usableFrames = Math.max(1, durationInFrames - Math.round(END_PADDING_SECONDS * FPS));
   const totalChars = lines.reduce((sum, line) => sum + line.length, 0) || 1;
-  
+
   let cursor = 0;
   const timed = lines.map((line) => {
     const share = line.length / totalChars;
@@ -321,45 +322,42 @@ const Subtitles: React.FC<{ lines: string[]; accentColor: string }> = ({ lines, 
     cursor = end;
     return { line, start, end };
   });
-  
+
   timed[timed.length - 1].end = usableFrames;
-  
+
   const active = timed.find((item) => frame >= item.start && frame < item.end);
   if (!active) return null;
-  
+
   const local = frame - active.start;
   const opacity = interpolate(local, [0, 8], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: ease,
   });
-  
-  // Nice bounce pop-in scale effect
-  const scale = interpolate(local, [0, 8], [0.93, 1], {
+
+  const scale = interpolate(local, [0, 8], [0.94, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.back(1.5)),
   });
-  
+
   const isHook = lines.indexOf(active.line) === 0;
-  
+
   return (
     <Interactive.Div
       name="Subtitle"
       style={{
         width: 860,
-        background: "rgba(10, 25, 35, 0.45)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        border: `2.5px solid ${isHook ? accentColor : "rgba(255,255,255,0.15)"}`,
-        borderRadius: 24,
-        padding: "28px 36px",
-        color: isHook ? "#ffffff" : COLORS.text,
-        fontSize: isHook ? 45 : 38,
-        fontWeight: 700,
+        background: "rgba(20, 16, 12, 0.85)", // Solid dark wood color for high-speed render
+        border: `2px solid ${isHook ? accentColor : "rgba(255, 255, 255, 0.12)"}`,
+        borderRadius: 28,
+        padding: "30px 40px",
+        color: isHook ? COLORS.accentGold : COLORS.text,
+        fontSize: isHook ? 46 : 38,
+        fontWeight: 800,
         lineHeight: 1.4,
         textAlign: "center",
-        boxShadow: "0 25px 60px rgba(0,0,0,0.4)",
+        boxShadow: "0 30px 60px rgba(0,0,0,0.6)",
         opacity,
         transform: `scale(${scale})`,
         translate: interpolate(local, [0, 8], ["0px 15px", "0px 0px"], {
@@ -367,7 +365,6 @@ const Subtitles: React.FC<{ lines: string[]; accentColor: string }> = ({ lines, 
           extrapolateRight: "clamp",
           easing: ease,
         }),
-        zIndex: 3,
       }}
     >
       {parseRichText(active.line, accentColor)}
@@ -377,20 +374,20 @@ const Subtitles: React.FC<{ lines: string[]; accentColor: string }> = ({ lines, 
 
 const Footer: React.FC<{ accentColor: string }> = ({ accentColor }) => {
   const frame = useCurrentFrame();
-  
+
   return (
     <Interactive.Div
       name="Footer CTA"
       style={{
-        color: accentColor,
-        fontSize: 30,
-        fontWeight: 700,
+        color: COLORS.accentGold,
+        fontSize: 32,
+        fontWeight: 800,
         textAlign: "center",
         opacity: interpolate(frame, [20, 40], [0, 1], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
         }),
-        zIndex: 3,
+        textShadow: "0 2px 10px rgba(0,0,0,0.8)",
       }}
     >
       uvisionpk.com  ·  +92 304 9301811
@@ -404,7 +401,7 @@ const ProgressBar: React.FC<{ accentColor: string }> = ({ accentColor }) => {
   const progress = interpolate(frame, [0, durationInFrames - 1], [0, 100], {
     extrapolateRight: "clamp",
   });
-  
+
   return (
     <div
       style={{
@@ -413,7 +410,7 @@ const ProgressBar: React.FC<{ accentColor: string }> = ({ accentColor }) => {
         left: 0,
         width: "100%",
         height: 12,
-        backgroundColor: "rgba(255, 255, 255, 0.08)",
+        backgroundColor: "rgba(255, 255, 255, 0.05)",
         zIndex: 10,
       }}
     >
@@ -421,33 +418,29 @@ const ProgressBar: React.FC<{ accentColor: string }> = ({ accentColor }) => {
         style={{
           width: `${progress}%`,
           height: "100%",
-          background: `linear-gradient(90deg, ${accentColor} 0%, #ffffff 100%)`,
-          boxShadow: `0 0 10px ${accentColor}`,
+          background: `linear-gradient(90deg, ${accentColor} 0%, ${COLORS.accentGold} 100%)`,
+          boxShadow: `0 0 15px ${accentColor}`,
         }}
       />
     </div>
   );
 };
 
-export const PosVideo: React.FC<PosVideoProps> = ({
+export const RestaurantVideo: React.FC<RestaurantVideoProps> = ({
   imageUrl,
   audioUrl,
   backgroundMusicUrl,
   text,
-  prompt: _prompt,
   hookText,
   bodyText,
   themeColor,
 }) => {
-  const accentColor = themeColor || COLORS.accent;
-  
-  // If hookText and bodyText are provided, use them as display subtitles.
+  const accentColor = themeColor || COLORS.accentOrange;
   const lines = (hookText || bodyText)
     ? [hookText, bodyText].filter(Boolean) as string[]
     : cleanDisplayLines(text);
 
-  // Generate 15 background particle keys
-  const particles = Array.from({ length: 15 });
+  const embers = Array.from({ length: 15 });
 
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.bg, fontFamily, overflow: "hidden" }}>
@@ -455,16 +448,11 @@ export const PosVideo: React.FC<PosVideoProps> = ({
         <Background imageUrl={imageUrl} />
       </Sequence>
 
-      {/* Floating dust particles */}
+      {/* Floating hot embers/steam */}
       <AbsoluteFill style={{ pointerEvents: "none", zIndex: 1 }}>
-        {particles.map((_, i) => (
-          <Particle key={i} index={i} accentColor={accentColor} />
+        {embers.map((_, i) => (
+          <Ember key={i} index={i} color={i % 2 === 0 ? accentColor : COLORS.accentGold} />
         ))}
-      </AbsoluteFill>
-
-      {/* Dynamic Ambient Backlight Glow behind the Hero Image */}
-      <AbsoluteFill style={{ pointerEvents: "none", zIndex: 1 }}>
-        <GlowOrb accentColor={accentColor} />
       </AbsoluteFill>
 
       {audioUrl ? (
@@ -475,7 +463,7 @@ export const PosVideo: React.FC<PosVideoProps> = ({
 
       {backgroundMusicUrl ? (
         <Sequence name="Background music">
-          <Audio src={backgroundMusicUrl} volume={0.1} loop />
+          <Audio src={backgroundMusicUrl} volume={0.12} loop />
         </Sequence>
       ) : null}
 
@@ -485,18 +473,17 @@ export const PosVideo: React.FC<PosVideoProps> = ({
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "100px 80px",
-          gap: 36,
+          padding: "90px 80px",
+          gap: 30,
           zIndex: 3,
         }}
       >
         <BrandHeader accentColor={accentColor} />
-        <HeroImage imageUrl={imageUrl} accentColor={accentColor} />
+        <RestaurantHero imageUrl={imageUrl} accentColor={accentColor} />
         <Subtitles lines={lines} accentColor={accentColor} />
         <Footer accentColor={accentColor} />
       </AbsoluteFill>
 
-      {/* Video Progress Bar */}
       <ProgressBar accentColor={accentColor} />
     </AbsoluteFill>
   );
