@@ -1,8 +1,6 @@
 name: Render Remotion Video
 
 on:
-  push:
-    branches: [ main ]
   repository_dispatch:
     types: [render_video]
   workflow_dispatch:
@@ -68,9 +66,14 @@ jobs:
         env:
           IMAGE_URL: ${{ github.event.client_payload.image_url || inputs.image_url || 'https://uvisionpk.com/upload_media_api/uploads/generated_post_image.jpeg' }}
           SCRIPT: ${{ github.event.client_payload.script || inputs.script || 'This is a test render triggered automatically by Git push!' }}
-          COMPOSITION: ${{ github.event.client_payload.composition || inputs.composition || 'PosVideo' }}
+          COMPOSITION: ${{ github.event.client_payload.composition || inputs.composition || 'random' }}
           BACKGROUND_MUSIC_URL: ${{ github.event.client_payload.background_music_url || inputs.background_music_url }}
           WEBHOOK_URL: ${{ github.event.client_payload.webhook_url || inputs.webhook_url }}
+          HOOK_TEXT: ${{ github.event.client_payload.hook_text || github.event.client_payload.hookText || github.event.client_payload.hook }}
+          BODY_TEXT: ${{ github.event.client_payload.body_text || github.event.client_payload.bodyText || github.event.client_payload.body }}
+          THEME_COLOR: ${{ github.event.client_payload.theme_color || github.event.client_payload.themeColor || github.event.client_payload.color }}
+          INDUSTRY: ${{ github.event.client_payload.industry }}
+          LAYOUT_STYLE: ${{ toJson(github.event.client_payload.layoutStyle || github.event.client_payload.layout_style) }}
           AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
           AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION || 'eastus' }}
           AZURE_VOICE: ${{ secrets.AZURE_VOICE || 'en-IN-NeerjaNeural' }}

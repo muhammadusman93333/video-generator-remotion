@@ -8,12 +8,22 @@ const ffprobeInstaller = require("@ffprobe-installer/ffprobe");
 // Parse inputs from Env
 const IMAGE_URL = process.env.IMAGE_URL;
 const SCRIPT = process.env.SCRIPT || process.env.TEXT;
-const COMPOSITION = process.env.COMPOSITION || "PosVideo";
+let COMPOSITION = process.env.COMPOSITION || "random";
+if (COMPOSITION === "random" || COMPOSITION === "IndustryVideo") {
+  const randomId = Math.floor(Math.random() * 6) + 1;
+  COMPOSITION = `IndustryVideoV${randomId}`;
+}
 const BACKGROUND_MUSIC_URL = process.env.BACKGROUND_MUSIC_URL;
 const WEBHOOK_URL = process.env.WEBHOOK_URL;
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
 const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
+
+const HOOK_TEXT = process.env.HOOK_TEXT || process.env.HOOK || "";
+const BODY_TEXT = process.env.BODY_TEXT || process.env.BODY || "";
+const THEME_COLOR = process.env.THEME_COLOR || process.env.COLOR || "";
+const INDUSTRY = process.env.INDUSTRY || "";
+const LAYOUT_STYLE = process.env.LAYOUT_STYLE ? JSON.parse(process.env.LAYOUT_STYLE) : null;
 
 const tempDir = path.join(__dirname, "..", "temp");
 const renderDir = path.join(__dirname, "..", "renders");
@@ -285,7 +295,12 @@ async function main() {
       audioUrl: localAudioUrl,
       backgroundMusicUrl: BACKGROUND_MUSIC_URL || `http://localhost:${PORT}/public/background-music.mp3`,
       text: SCRIPT,
-      prompt: ""
+      prompt: "",
+      hookText: HOOK_TEXT,
+      bodyText: BODY_TEXT,
+      themeColor: THEME_COLOR,
+      industry: INDUSTRY,
+      layoutStyle: LAYOUT_STYLE || {},
     };
 
     fs.writeFileSync(propsFile, JSON.stringify(props));
