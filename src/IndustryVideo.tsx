@@ -327,15 +327,9 @@ const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
           width: 380, // Bigger logo size
           height: 110,
           position: "relative",
-          overflow: "hidden", // Restore overflow crop to align and restrict shine to the logo face!
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "rgba(255, 255, 255, 0.85)", // Light prominent background
-          borderRadius: "55px", // Pill shape
-          boxShadow: "0 12px 35px rgba(0, 0, 0, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.8)",
-          border: "2px solid rgba(255, 255, 255, 0.95)",
-          padding: "0 25px",
         }}
       >
         <Img
@@ -344,19 +338,9 @@ const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            translate: "-0.1px 4px" // Adjusted translation for visual centering in new pill shape
+            filter: `drop-shadow(0 4px 8px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 15px ${accentColor}cc) drop-shadow(0 0 4px #ffffff)`,
+            translate: "-0.1px 4px",
           }} />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: 45,
-            height: "100%",
-            background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.45) 50%, rgba(255,255,255,0) 100%)",
-            transform: `skewX(-25deg) translateX(${shineTranslate}px)`,
-          }}
-        />
       </div>
     </Interactive.Div>
   );
