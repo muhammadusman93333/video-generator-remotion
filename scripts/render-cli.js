@@ -13,7 +13,7 @@ if (COMPOSITION === "random") {
   COMPOSITION = "IndustryVideo";
 }
 const BACKGROUND_MUSIC_URL = process.env.BACKGROUND_MUSIC_URL;
-const WEBHOOK_URL = process.env.WEBHOOK_URL;
+const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://hook.eu2.make.com/mftwy7vnporr8a94p7qqhgfb26erf2jm";
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
 const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
@@ -205,8 +205,13 @@ async function sendWebhook(videoUrl) {
   const data = JSON.stringify({
     status: "success",
     video_url: videoUrl,
+    videoUrl: videoUrl,
+    "video url": videoUrl,
     composition: COMPOSITION,
-    script: SCRIPT
+    script: SCRIPT,
+    hook: HOOK_TEXT,
+    body: BODY_TEXT,
+    industry: INDUSTRY
   });
 
   return new Promise((resolve) => {
