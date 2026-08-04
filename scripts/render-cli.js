@@ -13,7 +13,7 @@ if (COMPOSITION === "random") {
   COMPOSITION = "IndustryVideo";
 }
 const BACKGROUND_MUSIC_URL = process.env.BACKGROUND_MUSIC_URL;
-const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://hook.eu2.make.com/mftwy7vnporr8a94p7qqhgfb26erf2jm";
+const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://hook.eu1.make.com/e2avx9zifa0826b6gjn9vuizbp3rgnlk";
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
 const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
