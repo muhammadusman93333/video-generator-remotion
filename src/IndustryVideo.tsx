@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -316,11 +316,14 @@ const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
         justifyContent: "center",
         alignItems: "center",
         width: "100%",
+
         opacity: interpolate(frame, [0, 15], [0, 1], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
           easing: ease,
         }),
+
+        translate: "0px 11.1px"
       }}>
       <div
         style={{
@@ -339,7 +342,7 @@ const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
             height: "100%",
             objectFit: "contain",
             filter: `drop-shadow(0 4px 8px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 15px ${accentColor}cc) drop-shadow(0 0 4px #ffffff)`,
-            translate: "-0.1px 4px",
+            translate: "0px -66px",
           }} />
       </div>
     </Interactive.Div>
@@ -453,7 +456,6 @@ const CustomHero: React.FC<{
           }}
         />
       )}
-
       {/* Main Cropped Image Container */}
       <div
         style={{
@@ -476,6 +478,7 @@ const CustomHero: React.FC<{
             height: "100%",
             objectFit: "cover",
             transform: `scale(${pulseScale})`,
+            translate: "-0.1px -0.1px"
           }}
         />
         {/* Holographic light sweep overlay for 3D card */}
@@ -585,7 +588,10 @@ const HookBanner: React.FC<{ hookText: string; accentColor: string; layoutStyle:
       name="Hook Banner"
       style={{
         width: 900,
-        background: "rgba(10, 14, 22, 0.65)", // Frosted glass backing
+
+        // Frosted glass backing
+        background: "rgba(10, 14, 22, 0.65)",
+
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         border: `3px solid ${accentColor}`,
@@ -593,7 +599,10 @@ const HookBanner: React.FC<{ hookText: string; accentColor: string; layoutStyle:
         padding: "16px 28px",
         color: "#ffffff",
         fontFamily: activeFont,
-        fontSize: 36, // Easily readable size
+
+        // Easily readable size
+        fontSize: 36,
+
         fontWeight: 800,
         textAlign: "center",
         boxShadow: `0 15px 35px rgba(0,0,0,0.6), 0 0 25px ${accentColor}33`,
@@ -601,9 +610,16 @@ const HookBanner: React.FC<{ hookText: string; accentColor: string; layoutStyle:
         letterSpacing: 1.5,
         opacity,
         transform,
-        WebkitTextStroke: "1px #000000", // Fine black outline for high contrast
-        textShadow: "0 4px 12px rgba(0,0,0,0.7)", // Soft clean shadow
+
+        // Fine black outline for high contrast
+        WebkitTextStroke: "1px #000000",
+
+        // Soft clean shadow
+        textShadow: "0 4px 12px rgba(0,0,0,0.7)",
+
         zIndex: 90,
+        translate: "0px 110.8px",
+        scale: 0.492
       }}
     >
       {hookText}
@@ -665,17 +681,26 @@ const Subtitles: React.FC<{ lines: string[]; accentColor: string; category: stri
       name="Subtitle"
       style={{
         width: 900,
-        background: "rgba(10, 14, 22, 0.65)", // Frosted glass backing
+
+        // Frosted glass backing
+        background: "rgba(10, 14, 22, 0.65)",
+
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        border: `4px solid ${accentColor}`, // Prominent border matching the active themeColor
+
+        // Prominent border matching the active themeColor
+        border: `4px solid ${accentColor}`,
+
         borderRadius: 28,
         padding: "30px 40px",
         color: "#ffffff",
         fontFamily: activeFont,
         textTransform: "uppercase",
         letterSpacing: 1.5,
-        fontSize: 54, // Consistent clean subtitle size
+
+        // Consistent clean subtitle size
+        fontSize: 54,
+
         fontWeight: 900,
         lineHeight: 1.25,
         textAlign: "center",
@@ -684,6 +709,7 @@ const Subtitles: React.FC<{ lines: string[]; accentColor: string; category: stri
         opacity,
         transform,
         zIndex: 100,
+        translate: "0px -20.3px"
       }}
     >
       {parseRichText(active.line, accentColor, category)}
@@ -699,18 +725,29 @@ const Footer: React.FC<{ accentColor: string }> = ({ accentColor }) => {
     <Interactive.Div
       name="Footer CTA"
       style={{
-        color: accentColor,
-        fontSize: 32,
-        fontWeight: 800,
-        textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 20,
+        background: "rgba(10, 14, 22, 0.75)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: `3px solid ${accentColor}`,
+        borderRadius: "30px",
+        padding: "16px 40px",
+        boxShadow: `0 15px 35px rgba(0, 0, 0, 0.4), 0 0 25px ${accentColor}44`,
+
         opacity: interpolate(frame, [20, 40], [0, 1], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
         }),
-        textShadow: "0 2px 10px rgba(0,0,0,0.8)",
+
+        translate: "0px -1535.9px"
       }}
     >
-      uvisionpk.com  ·  +92 304 9301811
+      <span style={{ color: "#ffffff", fontSize: 32, fontWeight: 800, letterSpacing: 0.5 }}>🌐 uvisionpk.com</span>
+      <span style={{ color: accentColor, fontSize: 36, fontWeight: 900 }}>·</span>
+      <span style={{ color: "#ffffff", fontSize: 32, fontWeight: 800, letterSpacing: 0.5 }}>📞 +92 304 9301811</span>
     </Interactive.Div>
   );
 };
@@ -748,6 +785,8 @@ const ProgressBar: React.FC<{ accentColor: string }> = ({ accentColor }) => {
 
 
 
+const randomSeed = Math.floor(Math.random() * 100000);
+
 export const IndustryVideo: React.FC<IndustryVideoProps> = ({
   imageUrl,
   audioUrl,
@@ -759,25 +798,19 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
   industry,
   layoutStyle = {},
 }) => {
-  const [randomStyle] = useState(() => {
+  const activeStyle = useMemo(() => {
     const shapes = ["circle", "hexagon", "card3d", "diagonal", "blob", "squircle"];
     const animations = ["spring", "fade", "glitch", "slideLeft", "slideRight"];
     const glows = ["neon", "metallic", "glass", "none"];
     const fonts = ["outfit", "lilita", "poppins", "inter"];
-    return {
-      frameShape: shapes[Math.floor(Math.random() * shapes.length)] as any,
-      animationStyle: animations[Math.floor(Math.random() * animations.length)] as any,
-      borderGlow: glows[Math.floor(Math.random() * glows.length)] as any,
-      fontPair: fonts[Math.floor(Math.random() * fonts.length)] as any,
-    };
-  });
 
-  const activeStyle = {
-    frameShape: layoutStyle?.frameShape || randomStyle.frameShape,
-    animationStyle: layoutStyle?.animationStyle || randomStyle.animationStyle,
-    borderGlow: layoutStyle?.borderGlow || randomStyle.borderGlow,
-    fontPair: layoutStyle?.fontPair || randomStyle.fontPair,
-  };
+    return {
+      frameShape: layoutStyle?.frameShape || shapes[randomSeed % shapes.length] as any,
+      animationStyle: layoutStyle?.animationStyle || animations[(randomSeed + 2) % animations.length] as any,
+      borderGlow: layoutStyle?.borderGlow || glows[(randomSeed + 4) % glows.length] as any,
+      fontPair: layoutStyle?.fontPair || fonts[(randomSeed + 6) % fonts.length] as any,
+    };
+  }, [layoutStyle]);
 
   const accentColor = themeColor || COLORS.accentDefault;
   const category = getIndustryCategory(industry);
@@ -812,20 +845,35 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
       ) : null}
       <AbsoluteFill
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "90px 80px",
-          gap: 30,
           zIndex: 3,
         }}
       >
-        <BrandHeader accentColor={accentColor} />
-        {hookText ? <HookBanner hookText={hookText} accentColor={accentColor} layoutStyle={activeStyle} /> : null}
-        <CustomHero imageUrl={imageUrl} accentColor={accentColor} layoutStyle={activeStyle} />
-        <Subtitles lines={lines} accentColor={accentColor} category={category} layoutStyle={activeStyle} />
-        <Footer accentColor={accentColor} />
+        {/* Top Section: Logo */}
+        <div style={{ position: "absolute", top: 90, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 10 }}>
+          <BrandHeader accentColor={accentColor} />
+        </div>
+
+        {/* Hook Section */}
+        {hookText ? (
+          <div style={{ position: "absolute", top: 250, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 9 }}>
+            <HookBanner hookText={hookText} accentColor={accentColor} layoutStyle={activeStyle} />
+          </div>
+        ) : null}
+
+        {/* Center Section: Main Image */}
+        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, transform: "translateY(-50%)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 5 }}>
+          <CustomHero imageUrl={imageUrl} accentColor={accentColor} layoutStyle={activeStyle} />
+        </div>
+
+        {/* Subtitles Section (above Footer) */}
+        <div style={{ position: "absolute", bottom: 250, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 8 }}>
+          <Subtitles lines={lines} accentColor={accentColor} category={category} layoutStyle={activeStyle} />
+        </div>
+
+        {/* Bottom Section: Footer (CTA) */}
+        <div style={{ position: "absolute", bottom: 90, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 10 }}>
+          <Footer accentColor={accentColor} />
+        </div>
       </AbsoluteFill>
       <ProgressBar accentColor={accentColor} />
     </AbsoluteFill>
