@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -775,11 +775,31 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
   industry,
   layoutStyle = {},
 }) => {
+  const [randomStyle] = useState(() => {
+    const shapes = ["circle", "hexagon", "card3d", "diagonal", "blob", "squircle"];
+    const animations = ["spring", "fade", "glitch", "slideLeft", "slideRight"];
+    const glows = ["neon", "metallic", "glass", "none"];
+    const fonts = ["outfit", "lilita", "poppins", "inter"];
+    return {
+      frameShape: shapes[Math.floor(Math.random() * shapes.length)] as any,
+      animationStyle: animations[Math.floor(Math.random() * animations.length)] as any,
+      borderGlow: glows[Math.floor(Math.random() * glows.length)] as any,
+      fontPair: fonts[Math.floor(Math.random() * fonts.length)] as any,
+    };
+  });
+
+  const activeStyle = {
+    frameShape: layoutStyle?.frameShape || randomStyle.frameShape,
+    animationStyle: layoutStyle?.animationStyle || randomStyle.animationStyle,
+    borderGlow: layoutStyle?.borderGlow || randomStyle.borderGlow,
+    fontPair: layoutStyle?.fontPair || randomStyle.fontPair,
+  };
+
   const accentColor = themeColor || COLORS.accentDefault;
   const category = getIndustryCategory(industry);
 
   const lines = splitScriptIntoCaptions(text);
-  const activeFont = getFontFamily(layoutStyle.fontPair);
+  const activeFont = getFontFamily(activeStyle.fontPair);
 
   // Generate 15 dynamic background particles
   const particlesCount = 15;
@@ -818,9 +838,9 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
         }}
       >
         <BrandHeader accentColor={accentColor} />
-        {hookText ? <HookBanner hookText={hookText} accentColor={accentColor} layoutStyle={layoutStyle} /> : null}
-        <CustomHero imageUrl={imageUrl} accentColor={accentColor} layoutStyle={layoutStyle} />
-        <Subtitles lines={lines} accentColor={accentColor} category={category} layoutStyle={layoutStyle} />
+        {hookText ? <HookBanner hookText={hookText} accentColor={accentColor} layoutStyle={activeStyle} /> : null}
+        <CustomHero imageUrl={imageUrl} accentColor={accentColor} layoutStyle={activeStyle} />
+        <Subtitles lines={lines} accentColor={accentColor} category={category} layoutStyle={activeStyle} />
         <Footer accentColor={accentColor} />
       </AbsoluteFill>
       <ProgressBar accentColor={accentColor} />
