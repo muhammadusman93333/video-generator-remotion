@@ -477,8 +477,7 @@ const CustomHero: React.FC<{
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            transform: `scale(${pulseScale})`,
-            translate: "-0.1px -0.1px"
+            transform: `scale(${pulseScale})`
           }}
         />
         {/* Holographic light sweep overlay for 3D card */}
@@ -618,8 +617,8 @@ const HookBanner: React.FC<{ hookText: string; accentColor: string; layoutStyle:
         textShadow: "0 4px 12px rgba(0,0,0,0.7)",
 
         zIndex: 90,
-        translate: "0px 110.8px",
-        scale: 0.492
+        translate: "0px 61px",
+        scale: 0.186
       }}
     >
       {hookText}
@@ -742,7 +741,7 @@ const Footer: React.FC<{ accentColor: string }> = ({ accentColor }) => {
           extrapolateRight: "clamp",
         }),
 
-        translate: "0px -1535.9px"
+        translate: "0px -38.7px"
       }}
     >
       <span style={{ color: "#ffffff", fontSize: 32, fontWeight: 800, letterSpacing: 0.5 }}>🌐 uvisionpk.com</span>
