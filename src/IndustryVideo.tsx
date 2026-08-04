@@ -325,12 +325,17 @@ const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
       <div
         style={{
           width: 380, // Bigger logo size
-          height: 120,
+          height: 110,
           position: "relative",
           overflow: "hidden", // Restore overflow crop to align and restrict shine to the logo face!
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
+          backgroundColor: "rgba(255, 255, 255, 0.85)", // Light prominent background
+          borderRadius: "55px", // Pill shape
+          boxShadow: "0 12px 35px rgba(0, 0, 0, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.8)",
+          border: "2px solid rgba(255, 255, 255, 0.95)",
+          padding: "0 25px",
         }}
       >
         <Img
@@ -339,7 +344,7 @@ const BrandHeader: React.FC<{ accentColor: string }> = ({ accentColor }) => {
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            translate: "-0.1px 9.9px"
+            translate: "-0.1px 4px" // Adjusted translation for visual centering in new pill shape
           }} />
         <div
           style={{
