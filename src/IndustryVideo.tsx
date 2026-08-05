@@ -115,20 +115,36 @@ export const calculateIndustryVideoMetadata: CalculateMetadataFunction<
 
 const getIndustryCategory = (industry: string = "") => {
   const norm = industry.toLowerCase().trim();
-  if (norm.includes("grocery") || norm.includes("milk") || norm.includes("dairy") || norm.includes("meat") || norm.includes("butcher") || norm.includes("fruit") || norm.includes("vegetable") || norm.includes("super store") || norm.includes("supermarket")) return "grocery";
+  if (norm.includes("dairy") || norm.includes("milk")) return "dairy";
+  if (norm.includes("meat") || norm.includes("butcher")) return "meat";
+  if (norm.includes("fruit") || norm.includes("vegetable")) return "fruitvegetable";
+  if (norm.includes("stationery")) return "stationery";
+  if (norm.includes("fabric") || norm.includes("cloth")) return "fabric";
+  if (norm.includes("jewelry")) return "jewelry";
+  if (norm.includes("sweets") || norm.includes("mithai")) return "sweets";
+  if (norm.includes("paint")) return "paint";
+  if (norm.includes("sanitary") || norm.includes("tiles")) return "sanitary";
+  if (norm.includes("juice") || norm.includes("shake")) return "juice";
+  if (norm.includes("cleaners") || norm.includes("laundry")) return "laundry";
+  if (norm.includes("mobile") && norm.includes("repair")) return "mobilerepair";
+  if (norm.includes("super store") || norm.includes("supermarket")) return "superstore";
+  if (norm.includes("optical") || norm.includes("eyewear")) return "optical";
+  if (norm.includes("pet")) return "pet";
+  if (norm.includes("tea") || norm.includes("chai")) return "tea";
+  if (norm.includes("grocery")) return "grocery";
   if (norm.includes("pharmacy") || norm.includes("medical")) return "pharmacy";
   if (norm.includes("restaurant") || norm.includes("dhaba") || norm.includes("food")) return "restaurant";
-  if (norm.includes("fashion") || norm.includes("boutique") || norm.includes("clothing") || norm.includes("fabric") || norm.includes("cloth") || norm.includes("jewelry") || norm.includes("optical") || norm.includes("eyewear") || norm.includes("cleaners") || norm.includes("laundry")) return "fashion";
-  if (norm.includes("coffee") || norm.includes("tea") || norm.includes("chai")) return "coffee";
+  if (norm.includes("fashion") || norm.includes("boutique") || norm.includes("clothing")) return "fashion";
+  if (norm.includes("coffee")) return "coffee";
   if (norm.includes("shoe")) return "shoe";
-  if (norm.includes("ice cream") || norm.includes("juice") || norm.includes("shake")) return "icecream";
+  if (norm.includes("ice cream")) return "icecream";
   if (norm.includes("cosmetic")) return "cosmetics";
-  if (norm.includes("mobile") && !norm.includes("repair")) return "mobile";
-  if (norm.includes("bakery") || norm.includes("sweets") || norm.includes("mithai")) return "bakery";
-  if (norm.includes("hardware") || norm.includes("paint") || norm.includes("sanitary") || norm.includes("tiles")) return "hardware";
-  if (norm.includes("toy") || norm.includes("pet")) return "toy";
-  if (norm.includes("electronics") || norm.includes("repair")) return "electronics";
-  if (norm.includes("book") || norm.includes("stationery") || norm.includes("gift")) return "book";
+  if (norm.includes("mobile")) return "mobile";
+  if (norm.includes("bakery")) return "bakery";
+  if (norm.includes("hardware")) return "hardware";
+  if (norm.includes("toy")) return "toy";
+  if (norm.includes("electronics")) return "electronics";
+  if (norm.includes("book") || norm.includes("gift")) return "book";
   if (norm.includes("gym") || norm.includes("fitness")) return "gym";
   if (norm.includes("auto") || norm.includes("parts")) return "autoparts";
   return "default";
@@ -222,6 +238,38 @@ const Background: React.FC<{ imageUrl: string; category: string }> = ({ imageUrl
     bannerImg = staticFile("upos_banner_book.png");
   } else if (category === "gym") {
     bannerImg = staticFile("upos_banner_gym.png");
+  } else if (category === "dairy") {
+    bannerImg = staticFile("upos_banner_dairy.png");
+  } else if (category === "meat") {
+    bannerImg = staticFile("upos_banner_meat.png");
+  } else if (category === "fruitvegetable") {
+    bannerImg = staticFile("upos_banner_fruitvegetable.png");
+  } else if (category === "stationery") {
+    bannerImg = staticFile("upos_banner_stationery.png");
+  } else if (category === "fabric") {
+    bannerImg = staticFile("upos_banner_fabric.png");
+  } else if (category === "jewelry") {
+    bannerImg = staticFile("upos_banner_jewelry.png");
+  } else if (category === "sweets") {
+    bannerImg = staticFile("upos_banner_sweets.png");
+  } else if (category === "paint") {
+    bannerImg = staticFile("upos_banner_paint.png");
+  } else if (category === "sanitary") {
+    bannerImg = staticFile("upos_banner_sanitary.png");
+  } else if (category === "juice") {
+    bannerImg = staticFile("upos_banner_juice.png");
+  } else if (category === "laundry") {
+    bannerImg = staticFile("upos_banner_laundry.png");
+  } else if (category === "mobilerepair") {
+    bannerImg = staticFile("upos_banner_mobilerepair.png");
+  } else if (category === "superstore") {
+    bannerImg = staticFile("upos_banner_superstore.png");
+  } else if (category === "optical") {
+    bannerImg = staticFile("upos_banner_optical.png");
+  } else if (category === "pet") {
+    bannerImg = staticFile("upos_banner_pet.png");
+  } else if (category === "tea") {
+    bannerImg = staticFile("upos_banner_coffee.png");
   }
 
   // Zoom standard banner images slightly more for 9:16 vertical crop
