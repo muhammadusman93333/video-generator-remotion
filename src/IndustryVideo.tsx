@@ -129,6 +129,8 @@ const getIndustryCategory = (industry: string = "") => {
   if (norm.includes("toy") || norm.includes("pet")) return "toy";
   if (norm.includes("electronics") || norm.includes("repair")) return "electronics";
   if (norm.includes("book") || norm.includes("stationery") || norm.includes("gift")) return "book";
+  if (norm.includes("gym") || norm.includes("fitness")) return "gym";
+  if (norm.includes("auto") || norm.includes("parts")) return "autoparts";
   return "default";
 };
 
@@ -212,6 +214,10 @@ const Background: React.FC<{ imageUrl: string; category: string }> = ({ imageUrl
     bannerImg = staticFile("upos_banner_hardware.png");
   } else if (category === "toy") {
     bannerImg = staticFile("upos_banner_toy.png");
+  } else if (category === "book") {
+    bannerImg = staticFile("upos_banner_book.png");
+  } else if (category === "gym") {
+    bannerImg = staticFile("upos_banner_gym.png");
   }
 
   // Zoom standard banner images slightly more for 9:16 vertical crop
