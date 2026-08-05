@@ -207,6 +207,8 @@ async function sendWebhook(videoUrl) {
     video_url: videoUrl,
     videoUrl: videoUrl,
     "video url": videoUrl,
+    image_url: IMAGE_URL,
+    imageUrl: IMAGE_URL,
     composition: COMPOSITION,
     script: SCRIPT,
     hook: HOOK_TEXT,
