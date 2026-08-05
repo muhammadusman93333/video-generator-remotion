@@ -206,12 +206,16 @@ const Background: React.FC<{ imageUrl: string; category: string }> = ({ imageUrl
     bannerImg = staticFile("upos_banner_icecream.png");
   } else if (category === "cosmetics") {
     bannerImg = staticFile("upos_banner_cosmetics.png");
-  } else if (category === "mobile" || category === "electronics") {
+  } else if (category === "mobile") {
     bannerImg = staticFile("upos_banner_mobile.png");
+  } else if (category === "electronics") {
+    bannerImg = staticFile("upos_banner_electronics.png");
   } else if (category === "bakery") {
     bannerImg = staticFile("upos_banner_bakery.png");
-  } else if (category === "hardware" || category === "autoparts") {
+  } else if (category === "hardware") {
     bannerImg = staticFile("upos_banner_hardware.png");
+  } else if (category === "autoparts") {
+    bannerImg = staticFile("upos_banner_autoparts.png");
   } else if (category === "toy") {
     bannerImg = staticFile("upos_banner_toy.png");
   } else if (category === "book") {
