@@ -16,6 +16,11 @@ import {
   calculateIndustryVideoMetadata,
   industryVideoDefaultProps,
 } from "./IndustryVideo";
+import {
+  QuranicQalamVideo,
+  calculateQuranicQalamVideoMetadata,
+  quranicQalamVideoDefaultProps,
+} from "./QuranicQalamVideo";
 
 export const Root: React.FC = () => {
   return (
@@ -64,6 +69,16 @@ export const Root: React.FC = () => {
         height={1920}
         defaultProps={industryVideoDefaultProps}
         calculateMetadata={calculateIndustryVideoMetadata}
+      />
+      <Composition
+        id="QuranicQalamVideo"
+        component={QuranicQalamVideo}
+        durationInFrames={390}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={quranicQalamVideoDefaultProps}
+        calculateMetadata={calculateQuranicQalamVideoMetadata}
       />
     </>
   );

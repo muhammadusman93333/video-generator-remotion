@@ -607,6 +607,87 @@ app.post("/tts", async (req, res) => {
       message: error.message,
     });
   }
+app.post("/generate/quranic", async (req, res) => {
+  cleanOldTempFiles();
+  const script = req.body.script || req.body.text;
+  
+  if (!script) {
+    return res.status(400).json({
+      status: "error",
+      message: "Missing required field: script (or text)",
+    });
+  }
+
+  const composition = "QuranicQalamVideo";
+  const uniqueId = Math.random().toString(36).substring(7) + "_" + Date.now();
+  const localAudio = path.join(tempDir, `${uniqueId}_voice.mp3`);
+  const propsFile = path.join(tempDir, `${uniqueId}_props.json`);
+  const finalVideo = path.join(renderDir, `video_${uniqueId}.mp4`);
+  const baseUrl = getBaseUrl(req);
+
+  try {
+    // Default to ur-PK-UzmaNeural for high quality Urdu voiceover
+    const voice = req.body.voice || "ur-PK-UzmaNeural";
+    const style = req.body.style || req.body.tone || "";
+    let rate = req.body.rate || req.body.speed || "0%";
+    let pitch = req.body.pitch || "0%";
+
+    console.log(`[Quranic ${uniqueId}] Generating Azure Urdu TTS with voice ${voice}...`);
+    await generateAzureTts(script, localAudio, { voice, style, rate, pitch });
+
+    const durationSec = await getAudioDuration(localAudio);
+    const totalFrames = Math.max(120, Math.round((durationSec + 1.5) * 30));
+
+    const backgroundMusicUrl =
+      req.body.background_music_url ||
+      `${baseUrl}/public/background-music.mp3`;
+
+    const props = {
+      text: script,
+      audioUrl: `${baseUrl}/temp/${uniqueId}_voice.mp3`,
+      backgroundMusicUrl,
+      themeColor: req.body.themeColor || req.body.theme_color || "#C3A13B",
+    };
+
+    fs.writeFileSync(propsFile, JSON.stringify(props));
+
+    console.log(
+      `[Quranic ${uniqueId}] Rendering ${composition} (${totalFrames} frames)...`
+    );
+
+    const propsPath = propsFile.replace(/\\/g, "/");
+    const outPath = finalVideo.replace(/\\/g, "/");
+
+    const concurrency = process.env.REMOTION_CONCURRENCY || "1";
+    const concurrencyFlag = concurrency !== "auto" ? `--concurrency=${concurrency}` : "";
+    const browserFlags = process.env.REMOTION_BROWSER_FLAGS || "--disable-dev-shm-usage --no-sandbox --disable-gpu";
+
+    await runCommand(
+      `npx remotion render src/index.ts ${composition} "${outPath}" --duration=${totalFrames} --props="${propsPath}" ${concurrencyFlag} --browser-flags="${browserFlags}"`
+    );
+
+    // Clean up temporary audio and props files
+    safeUnlink(localAudio, propsFile);
+
+    const videoUrl = `${baseUrl}/renders/video_${uniqueId}.mp4`;
+    console.log(`[Quranic ${uniqueId}] Done: ${videoUrl}`);
+
+    res.json({
+      status: "success",
+      url: videoUrl,
+      video_url: videoUrl,
+      composition,
+      duration_seconds: durationSec,
+      frames: totalFrames,
+    });
+  } catch (error) {
+    console.error(`[Quranic ${uniqueId}] Error:`, error);
+    safeUnlink(localAudio, propsFile);
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
 });
 
 

@@ -5,6 +5,9 @@ const { exec } = require("child_process");
 const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
 const ffprobeInstaller = require("@ffprobe-installer/ffprobe");
 
+// Load environment variables from .env file
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+
 // Parse inputs from Env
 const IMAGE_URL = process.env.IMAGE_URL;
 const SCRIPT = process.env.SCRIPT || process.env.TEXT;
@@ -13,7 +16,7 @@ if (COMPOSITION === "random") {
   COMPOSITION = "IndustryVideo";
 }
 const BACKGROUND_MUSIC_URL = process.env.BACKGROUND_MUSIC_URL;
-const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://hook.eu1.make.com/e2avx9zifa0826b6gjn9vuizbp3rgnlk";
+const WEBHOOK_URL = process.env.WEBHOOK_URL || "";
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
 const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
@@ -171,29 +174,30 @@ async function uploadVideo(filePath) {
   const uploadUrl = process.env.UPLOAD_SERVER_URL || "https://uvisionpk.com/upload_media_api/upload_video.php";
   console.log(`Uploading video to ${uploadUrl}...`);
   const FormData = require("form-data");
+  const axios = require("axios");
   const form = new FormData();
   form.append("video", fs.createReadStream(filePath));
 
-  return new Promise((resolve, reject) => {
-    form.submit(uploadUrl, (err, res) => {
-      if (err) return reject(err);
+  const headers = {
+    ...form.getHeaders()
+  };
+  if (process.env.API_BEARER_TOKEN) {
+    headers["Authorization"] = `Bearer ${process.env.API_BEARER_TOKEN}`;
+  }
 
-      let body = "";
-      res.on("data", (chunk) => (body += chunk));
-      res.on("end", () => {
-        try {
-          const json = JSON.parse(body);
-          if (json.status === "success" && json.url) {
-            resolve(json.url);
-          } else {
-            reject(new Error(`Upload failed: ${body}`));
-          }
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-  });
+  try {
+    const response = await axios.post(uploadUrl, form, { headers });
+    if (response.data && response.data.status === "success" && response.data.url) {
+      return response.data.url;
+    } else {
+      throw new Error(`Upload failed: ${JSON.stringify(response.data)}`);
+    }
+  } catch (error) {
+    const errorMsg = error.response && error.response.data 
+      ? JSON.stringify(error.response.data) 
+      : error.message;
+    throw new Error(`Upload failed: ${errorMsg}`);
+  }
 }
 
 async function sendWebhook(videoUrl) {
