@@ -112,6 +112,11 @@ function convertCustomTagsToSsml(text) {
 
 function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
   return new Promise((resolve, reject) => {
+    let targetVoice = voice;
+    if (!targetVoice || targetVoice.includes("*") || targetVoice.trim() === "") {
+      targetVoice = "en-IN-NeerjaNeural";
+    }
+
     const cleanText = cleanVoiceText(text)
       .replace(/\[pause\]/gi, " ")
       .replace(/\[break\]/gi, " ")
@@ -119,40 +124,57 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
       .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1")
       .replace(/"/g, '\\"');
 
-    console.log(`[TTS Fallback] Requesting Edge-TTS (Voice: ${voice})...`);
+    const executeTts = (selectedVoice, callback) => {
+      console.log(`[TTS Fallback] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
+      const cmdEdgeTts = `edge-tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
+      const cmdPy3 = `python3 -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
+      const cmdPy = `python -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
 
-    const cmdEdgeTts = `edge-tts --text "${cleanText}" --write-media "${outFile}" --voice "${voice}"`;
-    const cmdPy3 = `python3 -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${voice}"`;
-    const cmdPy = `python -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${voice}"`;
-
-    const tryCommand = (cmd, nextCmds) => {
-      exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err) => {
-        if (!err && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
-          console.log(`[TTS Fallback] Edge-TTS generated successfully: ${outFile}`);
-          return resolve(outFile);
-        }
-        if (nextCmds.length > 0) {
-          tryCommand(nextCmds[0], nextCmds.slice(1));
-        } else {
-          // Attempt automatic pip installation of edge-tts and retry once
-          console.log("[TTS Fallback] edge-tts package not found. Auto-installing edge-tts via pip...");
-          exec("python3 -m pip install edge-tts || python -m pip install edge-tts", (installErr) => {
-            if (installErr) {
-              return reject(new Error(`Edge-TTS fallback failed and could not install edge-tts: ${installErr.message}`));
-            }
-            exec(cmdPy3, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
-              if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
-                console.log(`[TTS Fallback] Edge-TTS generated successfully after auto-install: ${outFile}`);
-                return resolve(outFile);
+      const tryCommand = (cmd, nextCmds) => {
+        exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err) => {
+          if (!err && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
+            return callback(null, outFile);
+          }
+          if (nextCmds.length > 0) {
+            tryCommand(nextCmds[0], nextCmds.slice(1));
+          } else {
+            console.log("[TTS Fallback] Package check or execution failed. Auto-installing edge-tts via pip...");
+            exec("python3 -m pip install edge-tts || python -m pip install edge-tts", (installErr) => {
+              if (installErr) {
+                return callback(installErr);
               }
-              reject(new Error(`Edge-TTS fallback failed after auto-install: ${retryErr ? retryErr.message : "Output file empty"}`));
+              exec(cmdPy3, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
+                if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
+                  return callback(null, outFile);
+                }
+                callback(retryErr || new Error("Output file empty"));
+              });
             });
-          });
-        }
-      });
+          }
+        });
+      };
+
+      tryCommand(cmdEdgeTts, [cmdPy3, cmdPy]);
     };
 
-    tryCommand(cmdEdgeTts, [cmdPy3, cmdPy]);
+    executeTts(targetVoice, (err, resFile) => {
+      if (!err && resFile) {
+        console.log(`[TTS Fallback] Edge-TTS generated successfully: ${resFile}`);
+        return resolve(resFile);
+      }
+      if (targetVoice !== "en-IN-NeerjaNeural") {
+        console.warn(`[TTS Fallback] Edge-TTS failed with voice '${targetVoice}'. Retrying with default 'en-IN-NeerjaNeural'...`);
+        executeTts("en-IN-NeerjaNeural", (retryErr, retryFile) => {
+          if (!retryErr && retryFile) {
+            console.log(`[TTS Fallback] Edge-TTS generated successfully with default voice: ${retryFile}`);
+            return resolve(retryFile);
+          }
+          reject(new Error(`Edge-TTS fallback failed: ${retryErr ? retryErr.message : "Output file empty"}`));
+        });
+      } else {
+        reject(new Error(`Edge-TTS fallback failed: ${err ? err.message : "Output file empty"}`));
+      }
+    });
   });
 }
 
