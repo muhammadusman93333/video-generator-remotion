@@ -607,6 +607,8 @@ app.post("/tts", async (req, res) => {
       message: error.message,
     });
   }
+});
+
 app.post("/generate/quranic", async (req, res) => {
   cleanOldTempFiles();
   const script = req.body.script || req.body.text;

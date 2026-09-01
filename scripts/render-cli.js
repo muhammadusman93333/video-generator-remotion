@@ -143,8 +143,12 @@ function generateAzureTts(text, outFile) {
         res.on("end", () => {
           const buffer = Buffer.concat(chunks);
           if (res.statusCode !== 200) {
+            let detail = buffer.toString("utf8");
+            if (res.statusCode === 401) {
+              detail += " (Unauthorized: Check if AZURE_SPEECH_KEY is valid and AZURE_SPEECH_REGION matches your Azure resource region in GitHub Secrets)";
+            }
             return reject(
-              new Error(`Azure TTS failed (${res.statusCode}): ${buffer.toString("utf8")}`)
+              new Error(`Azure TTS failed (${res.statusCode}): ${detail}`)
             );
           }
           fs.writeFileSync(outFile, buffer);
