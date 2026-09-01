@@ -138,6 +138,40 @@ function convertCustomTagsToSsml(text) {
   return escaped;
 }
 
+function generateEdgeTts(text, outFile, options = {}) {
+  return new Promise((resolve, reject) => {
+    const voice = options.voice || AZURE_VOICE || "en-IN-NeerjaNeural";
+    const cleanText = cleanVoiceText(text)
+      .replace(/\[pause\]/gi, " ")
+      .replace(/\[break\]/gi, " ")
+      .replace(/\[strong\](.*?)\[\/strong\]/gi, "$1")
+      .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1")
+      .replace(/"/g, '\\"');
+
+    console.log(`[TTS Fallback] Requesting Edge-TTS (Voice: ${voice})...`);
+
+    const cmdEdgeTts = `edge-tts --text "${cleanText}" --write-media "${outFile}" --voice "${voice}"`;
+    const cmdPy3 = `python3 -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${voice}"`;
+    const cmdPy = `python -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${voice}"`;
+
+    const tryCommand = (cmd, nextCmds) => {
+      exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err) => {
+        if (!err && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
+          console.log(`[TTS Fallback] Edge-TTS generated successfully: ${outFile}`);
+          return resolve(outFile);
+        }
+        if (nextCmds.length > 0) {
+          tryCommand(nextCmds[0], nextCmds.slice(1));
+        } else {
+          reject(new Error(`Edge-TTS fallback failed: ${err ? err.message : "Output file empty"}`));
+        }
+      });
+    };
+
+    tryCommand(cmdEdgeTts, [cmdPy3, cmdPy]);
+  });
+}
+
 function generateAzureTts(text, outFile, options = {}) {
   return new Promise((resolve, reject) => {
     if (!AZURE_SPEECH_KEY) {
@@ -209,6 +243,20 @@ function generateAzureTts(text, outFile, options = {}) {
     req.write(ssml);
     req.end();
   });
+}
+
+async function generateTtsWithFallback(text, outFile, options = {}) {
+  if (AZURE_SPEECH_KEY) {
+    try {
+      console.log("Generating Azure TTS...");
+      return await generateAzureTts(text, outFile, options);
+    } catch (azureErr) {
+      console.warn(`[Warning] Azure TTS failed (${azureErr.message}). Falling back to Edge-TTS...`);
+    }
+  } else {
+    console.log("No AZURE_SPEECH_KEY provided. Using Edge-TTS...");
+  }
+  return await generateEdgeTts(text, outFile, options);
 }
 
 function runCommand(command) {
@@ -580,7 +628,7 @@ app.post("/tts", async (req, res) => {
 
   try {
     console.log(`[TTS ${uniqueId}] Generating TTS...`);
-    await generateAzureTts(text, localAudio, { voice, style, rate, pitch });
+    await generateTtsWithFallback(text, localAudio, { voice, style, rate, pitch });
 
     const durationSec = await getAudioDuration(localAudio);
     const audioUrl = `${baseUrl}/temp/tts_${uniqueId}_voice.mp3`;
