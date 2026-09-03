@@ -61,6 +61,7 @@ export type IndustryVideoProps = {
   audioUrl: string;
   backgroundMusicUrl: string;
   text: string;
+  subtitles?: string;
   prompt?: string;
   hookText?: string;
   bodyText?: string;
@@ -74,6 +75,7 @@ export const industryVideoDefaultProps: IndustryVideoProps = {
   audioUrl: staticFile("voiceover/pos-video.mp3"),
   backgroundMusicUrl: staticFile("background-music.mp3"),
   text: "Restaurant billing me deri? [pause] U POS lagayein aur orders ko super-fast kitchen tak pahunchayein!",
+  subtitles: "",
   prompt: "",
   hookText: "Restaurant billing me deri?",
   bodyText: "orders ko super-fast kitchen tak pahunchayein!",
@@ -847,6 +849,7 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
   audioUrl,
   backgroundMusicUrl,
   text,
+  subtitles,
   hookText,
   bodyText,
   themeColor,
@@ -870,7 +873,7 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
   const accentColor = themeColor || COLORS.accentDefault;
   const category = getIndustryCategory(industry);
 
-  const lines = splitScriptIntoCaptions(text);
+  const lines = splitScriptIntoCaptions(subtitles || text);
   const activeFont = getFontFamily(activeStyle.fontPair);
 
   // Generate 15 dynamic background particles

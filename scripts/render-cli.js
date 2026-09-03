@@ -20,9 +20,11 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL || "";
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
 const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
+const TTS_PROVIDER = (process.env.TTS_PROVIDER || "edge").toLowerCase();
 
 const HOOK_TEXT = process.env.HOOK_TEXT || process.env.HOOK || "";
 const BODY_TEXT = process.env.BODY_TEXT || process.env.BODY || "";
+const SUBTITLES = process.env.SUBTITLES || process.env.SUBTITLE || "";
 const THEME_COLOR = process.env.THEME_COLOR || process.env.COLOR || "";
 const INDUSTRY = process.env.INDUSTRY || "";
 const LAYOUT_STYLE = process.env.LAYOUT_STYLE ? JSON.parse(process.env.LAYOUT_STYLE) : null;
@@ -121,14 +123,25 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
       .replace(/\[pause\]/gi, " ")
       .replace(/\[break\]/gi, " ")
       .replace(/\[strong\](.*?)\[\/strong\]/gi, "$1")
-      .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1")
-      .replace(/"/g, '\\"');
+      .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1");
+
+    const tempTextFile = path.join(tempDir, `tts_cli_${Date.now()}_${Math.random().toString(36).substring(7)}.txt`);
+    try {
+      fs.writeFileSync(tempTextFile, cleanText, "utf8");
+    } catch (writeErr) {
+      return reject(writeErr);
+    }
 
     const executeTts = (selectedVoice, callback) => {
-      console.log(`[TTS Fallback] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
-      const cmdEdgeTts = `edge-tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
-      const cmdPy3 = `python3 -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
-      const cmdPy = `python -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
+      console.log(`[TTS] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
+      const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
+      const cmdPy = `python -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
+      const cmdPyWin = `py -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
+      const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
+
+      const candidateCmds = process.platform === "win32"
+        ? [cmdEdgeTts, cmdPy, cmdPyWin]
+        : [cmdEdgeTts, cmdPy3, cmdPy];
 
       const tryCommand = (cmd, nextCmds) => {
         exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err) => {
@@ -138,12 +151,16 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
           if (nextCmds.length > 0) {
             tryCommand(nextCmds[0], nextCmds.slice(1));
           } else {
-            console.log("[TTS Fallback] Package check or execution failed. Auto-installing edge-tts via pip...");
-            exec("python3 -m pip install edge-tts || python -m pip install edge-tts", (installErr) => {
+            console.log("[TTS] Retrying with python pip install...");
+            const pipCmd = process.platform === "win32"
+              ? "python -m pip install edge-tts"
+              : "python3 -m pip install edge-tts || python -m pip install edge-tts";
+
+            exec(pipCmd, (installErr) => {
               if (installErr) {
                 return callback(installErr);
               }
-              exec(cmdPy3, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
+              exec(cmdPy, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
                 if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
                   return callback(null, outFile);
                 }
@@ -154,24 +171,27 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
         });
       };
 
-      tryCommand(cmdEdgeTts, [cmdPy3, cmdPy]);
+      tryCommand(candidateCmds[0], candidateCmds.slice(1));
     };
 
     executeTts(targetVoice, (err, resFile) => {
+      safeUnlink(tempTextFile);
       if (!err && resFile) {
-        console.log(`[TTS Fallback] Edge-TTS generated successfully: ${resFile}`);
+        console.log(`[TTS] Edge-TTS generated successfully: ${resFile}`);
         return resolve(resFile);
       }
       if (targetVoice !== "en-IN-NeerjaNeural") {
-        console.warn(`[TTS Fallback] Edge-TTS failed with voice '${targetVoice}'. Retrying with default 'en-IN-NeerjaNeural'...`);
+        console.warn(`[TTS] Edge-TTS failed with voice '${targetVoice}'. Retrying with default 'en-IN-NeerjaNeural'...`);
         executeTts("en-IN-NeerjaNeural", (retryErr, retryFile) => {
+          safeUnlink(tempTextFile);
           if (!retryErr && retryFile) {
-            console.log(`[TTS Fallback] Edge-TTS generated successfully with default voice: ${retryFile}`);
+            console.log(`[TTS] Edge-TTS generated successfully with default voice: ${retryFile}`);
             return resolve(retryFile);
           }
           reject(new Error(`Edge-TTS fallback failed: ${retryErr ? retryErr.message : "Output file empty"}`));
         });
       } else {
+        safeUnlink(tempTextFile);
         reject(new Error(`Edge-TTS fallback failed: ${err ? err.message : "Output file empty"}`));
       }
     });
@@ -232,6 +252,11 @@ function generateAzureTts(text, outFile) {
 }
 
 async function generateTtsWithFallback(text, outFile) {
+  if (TTS_PROVIDER === "edge" || TTS_PROVIDER === "edge-tts") {
+    console.log(`[TTS] Directly using Edge-TTS (Voice: ${AZURE_VOICE})...`);
+    return await generateEdgeTts(text, outFile);
+  }
+
   if (AZURE_SPEECH_KEY) {
     try {
       console.log("Generating Azure TTS...");
@@ -279,8 +304,8 @@ async function uploadVideo(filePath) {
       throw new Error(`Upload failed: ${JSON.stringify(response.data)}`);
     }
   } catch (error) {
-    const errorMsg = error.response && error.response.data 
-      ? JSON.stringify(error.response.data) 
+    const errorMsg = error.response && error.response.data
+      ? JSON.stringify(error.response.data)
       : error.message;
     throw new Error(`Upload failed: ${errorMsg}`);
   }
@@ -368,7 +393,7 @@ async function main() {
   const server = http.createServer((req, res) => {
     const urlPath = decodeURIComponent(req.url.split("?")[0]);
     let filePath = "";
-    
+
     if (urlPath.startsWith("/temp/")) {
       filePath = path.join(tempDir, urlPath.substring(6));
     } else if (urlPath.startsWith("/public/")) {
@@ -421,6 +446,7 @@ async function main() {
       audioUrl: localAudioUrl,
       backgroundMusicUrl: BACKGROUND_MUSIC_URL || `http://localhost:${PORT}/public/background-music.mp3`,
       text: SCRIPT,
+      subtitles: SUBTITLES || undefined,
       prompt: "",
       hookText: HOOK_TEXT,
       bodyText: BODY_TEXT,
@@ -461,7 +487,7 @@ async function main() {
       fs.unlinkSync(localAudio);
       fs.unlinkSync(propsFile);
       fs.unlinkSync(finalVideo);
-    } catch (_) {}
+    } catch (_) { }
 
     console.log("Process complete.");
   } catch (error) {
@@ -472,7 +498,7 @@ async function main() {
       fs.unlinkSync(localAudio);
       fs.unlinkSync(propsFile);
       fs.unlinkSync(finalVideo);
-    } catch (_) {}
+    } catch (_) { }
     process.exit(1);
   }
 }

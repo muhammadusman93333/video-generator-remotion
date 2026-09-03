@@ -38,7 +38,7 @@ app.use((req, res, next) => {
 });
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY;
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "eastus";
-const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-ArjunNeural";
+const AZURE_VOICE = process.env.AZURE_VOICE || "en-IN-NeerjaNeural";
 
 app.use(express.json({ limit: "2mb" }));
 app.use("/renders", express.static(path.join(__dirname, "renders")));
@@ -149,14 +149,27 @@ function generateEdgeTts(text, outFile, options = {}) {
       .replace(/\[pause\]/gi, " ")
       .replace(/\[break\]/gi, " ")
       .replace(/\[strong\](.*?)\[\/strong\]/gi, "$1")
-      .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1")
-      .replace(/"/g, '\\"');
+      .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1");
+
+    const tempTextFile = path.join(tempDir, `tts_txt_${Date.now()}_${Math.random().toString(36).substring(7)}.txt`);
+    try {
+      fs.writeFileSync(tempTextFile, cleanText, "utf8");
+    } catch (writeErr) {
+      return reject(writeErr);
+    }
+
+    const rateFlag = `--rate "${options.rate || '-4%'}"`;
 
     const executeTts = (selectedVoice, callback) => {
-      console.log(`[TTS Fallback] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
-      const cmdEdgeTts = `edge-tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
-      const cmdPy3 = `python3 -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
-      const cmdPy = `python -m edge_tts --text "${cleanText}" --write-media "${outFile}" --voice "${selectedVoice}"`;
+      console.log(`[TTS] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
+      const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPy = `python -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPyWin = `py -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+
+      const candidateCmds = process.platform === "win32"
+        ? [cmdEdgeTts, cmdPy, cmdPyWin]
+        : [cmdEdgeTts, cmdPy3, cmdPy];
 
       const tryCommand = (cmd, nextCmds) => {
         exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err) => {
@@ -166,12 +179,16 @@ function generateEdgeTts(text, outFile, options = {}) {
           if (nextCmds.length > 0) {
             tryCommand(nextCmds[0], nextCmds.slice(1));
           } else {
-            console.log("[TTS Fallback] Package check or execution failed. Auto-installing edge-tts via pip...");
-            exec("python3 -m pip install edge-tts || python -m pip install edge-tts", (installErr) => {
+            console.log("[TTS] Retrying with python pip install...");
+            const pipCmd = process.platform === "win32"
+              ? "python -m pip install edge-tts"
+              : "python3 -m pip install edge-tts || python -m pip install edge-tts";
+
+            exec(pipCmd, (installErr) => {
               if (installErr) {
                 return callback(installErr);
               }
-              exec(cmdPy3, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
+              exec(cmdPy, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
                 if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
                   return callback(null, outFile);
                 }
@@ -182,25 +199,28 @@ function generateEdgeTts(text, outFile, options = {}) {
         });
       };
 
-      tryCommand(cmdEdgeTts, [cmdPy3, cmdPy]);
+      tryCommand(candidateCmds[0], candidateCmds.slice(1));
     };
 
     executeTts(voice, (err, resFile) => {
+      safeUnlink(tempTextFile);
       if (!err && resFile) {
-        console.log(`[TTS Fallback] Edge-TTS generated successfully: ${resFile}`);
+        console.log(`[TTS] Edge-TTS generated successfully: ${resFile}`);
         return resolve(resFile);
       }
       if (voice !== "en-IN-NeerjaNeural") {
-        console.warn(`[TTS Fallback] Edge-TTS failed with voice '${voice}'. Retrying with default 'en-IN-NeerjaNeural'...`);
+        console.warn(`[TTS] Edge-TTS failed with voice '${voice}'. Retrying with default 'en-IN-NeerjaNeural'...`);
         executeTts("en-IN-NeerjaNeural", (retryErr, retryFile) => {
+          safeUnlink(tempTextFile);
           if (!retryErr && retryFile) {
-            console.log(`[TTS Fallback] Edge-TTS generated successfully with default voice: ${retryFile}`);
+            console.log(`[TTS] Edge-TTS generated successfully with default voice: ${retryFile}`);
             return resolve(retryFile);
           }
-          reject(new Error(`Edge-TTS fallback failed: ${retryErr ? retryErr.message : "Output file empty"}`));
+          reject(new Error(`Edge-TTS failed: ${retryErr ? retryErr.message : "Output file empty"}`));
         });
       } else {
-        reject(new Error(`Edge-TTS fallback failed: ${err ? err.message : "Output file empty"}`));
+        safeUnlink(tempTextFile);
+        reject(new Error(`Edge-TTS failed: ${err ? err.message : "Output file empty"}`));
       }
     });
   });
@@ -215,7 +235,7 @@ function generateAzureTts(text, outFile, options = {}) {
     }
 
     const voice = options.voice || AZURE_VOICE;
-    const rate = options.rate || "0%";
+    const rate = options.rate || "-4%";
     const pitch = options.pitch || "0%";
     const style = options.style || "";
 
@@ -280,6 +300,12 @@ function generateAzureTts(text, outFile, options = {}) {
 }
 
 async function generateTtsWithFallback(text, outFile, options = {}) {
+  const provider = (options.provider || options.engine || "edge").toLowerCase();
+  if (provider === "edge" || provider === "edge-tts") {
+    console.log(`[TTS] Directly using Edge-TTS (Voice: ${options.voice || AZURE_VOICE})...`);
+    return await generateEdgeTts(text, outFile, options);
+  }
+
   if (AZURE_SPEECH_KEY) {
     try {
       console.log("Generating Azure TTS...");
@@ -382,6 +408,8 @@ app.post("/generate", async (req, res) => {
   const imageUrl = req.body.image_url || req.body.imageUrl;
   const script =
     req.body.script || req.body.text || req.body.voiceover_script || req.body.voiceoverScript;
+  const subtitles =
+    req.body.subtitles || req.body.subtitle || req.body.subtitlesText || req.body.subtitles_text || "";
   const prompt = req.body.prompt || "";
   let composition = req.body.composition || "IndustryVideo";
   if (composition === "random") {
@@ -396,7 +424,7 @@ app.post("/generate", async (req, res) => {
     return res.status(400).json({
       status: "error",
       message:
-        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: prompt, composition, background_music_url, hookText, bodyText, themeColor",
+        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: subtitles, prompt, composition, background_music_url, hookText, bodyText, themeColor",
     });
   }
 
@@ -413,9 +441,10 @@ app.post("/generate", async (req, res) => {
 
     const voice = req.body.voice || AZURE_VOICE;
     const style = req.body.style || req.body.tone || "";
+    const provider = req.body.provider || req.body.engine || "";
     let rate = req.body.rate || req.body.speed;
     if (rate === undefined) {
-      rate = "+5%";
+      rate = "-4%";
     } else if (typeof rate === "number") {
       const percent = Math.round((rate - 1) * 100);
       rate = `${percent >= 0 ? "+" : ""}${percent}%`;
@@ -428,8 +457,8 @@ app.post("/generate", async (req, res) => {
       pitch = `${percent >= 0 ? "+" : ""}${percent}%`;
     }
 
-    console.log(`[${uniqueId}] Generating Azure TTS...`);
-    await generateAzureTts(script, localAudio, { voice, style, rate, pitch });
+    console.log(`[${uniqueId}] Generating TTS...`);
+    await generateTtsWithFallback(script, localAudio, { voice, style, rate, pitch, provider });
 
     const durationSec = await getAudioDuration(localAudio);
     const totalFrames = Math.max(90, Math.round((durationSec + 1.2) * 30));
@@ -445,6 +474,7 @@ app.post("/generate", async (req, res) => {
       audioUrl: `${baseUrl}/temp/${uniqueId}_voice.mp3`,
       backgroundMusicUrl,
       text: script,
+      subtitles: subtitles || undefined,
       prompt,
       hookText,
       bodyText,
@@ -503,6 +533,8 @@ app.post("/generate/restaurant", async (req, res) => {
   const imageUrl = req.body.image_url || req.body.imageUrl;
   const script =
     req.body.script || req.body.text || req.body.voiceover_script || req.body.voiceoverScript;
+  const subtitles =
+    req.body.subtitles || req.body.subtitle || req.body.subtitlesText || req.body.subtitles_text || "";
   const prompt = req.body.prompt || "";
   const composition = "IndustryVideo";
 
@@ -514,7 +546,7 @@ app.post("/generate/restaurant", async (req, res) => {
     return res.status(400).json({
       status: "error",
       message:
-        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: hookText, bodyText, themeColor",
+        "Missing required fields. Send JSON: { image_url, script } (script alias: text). Optional: subtitles, hookText, bodyText, themeColor",
     });
   }
 
@@ -531,9 +563,10 @@ app.post("/generate/restaurant", async (req, res) => {
 
     const voice = req.body.voice || AZURE_VOICE;
     const style = req.body.style || req.body.tone || "";
+    const provider = req.body.provider || req.body.engine || "";
     let rate = req.body.rate || req.body.speed;
     if (rate === undefined) {
-      rate = "+5%";
+      rate = "-4%";
     } else if (typeof rate === "number") {
       const percent = Math.round((rate - 1) * 100);
       rate = `${percent >= 0 ? "+" : ""}${percent}%`;
@@ -546,8 +579,8 @@ app.post("/generate/restaurant", async (req, res) => {
       pitch = `${percent >= 0 ? "+" : ""}${percent}%`;
     }
 
-    console.log(`[Restaurant ${uniqueId}] Generating Azure TTS...`);
-    await generateAzureTts(script, localAudio, { voice, style, rate, pitch });
+    console.log(`[Restaurant ${uniqueId}] Generating TTS...`);
+    await generateTtsWithFallback(script, localAudio, { voice, style, rate, pitch, provider });
 
     const durationSec = await getAudioDuration(localAudio);
     const totalFrames = Math.max(90, Math.round((durationSec + 1.2) * 30));
@@ -563,6 +596,7 @@ app.post("/generate/restaurant", async (req, res) => {
       audioUrl: `${baseUrl}/temp/${uniqueId}_voice.mp3`,
       backgroundMusicUrl,
       text: script,
+      subtitles: subtitles || undefined,
       prompt,
       hookText,
       bodyText,
@@ -618,7 +652,7 @@ app.post("/generate/restaurant", async (req, res) => {
  * Body JSON:
  * {
  *   "text": "Hello world",               // required (alias: script)
- *   "voice": "en-US-JennyNeural",        // optional
+ *   "voice": "en-IN-NeerjaNeural",       // optional (default: en-IN-NeerjaNeural)
  *   "style": "cheerful",                 // optional (alias: tone)
  *   "rate": "0%",                        // optional (alias: speed, can be string like "+10%" or number like 1.1)
  *   "pitch": "0%"                        // optional (can be string like "+5%" or number like 0.05)
@@ -639,10 +673,11 @@ app.post("/tts", async (req, res) => {
 
   const voice = req.body.voice || AZURE_VOICE;
   const style = req.body.style || req.body.tone || "";
+  const provider = req.body.provider || req.body.engine || "";
   
   let rate = req.body.rate || req.body.speed;
   if (rate === undefined) {
-    rate = "+5%";
+    rate = "-4%";
   } else if (typeof rate === "number") {
     const percent = Math.round((rate - 1) * 100);
     rate = `${percent >= 0 ? "+" : ""}${percent}%`;
@@ -662,7 +697,7 @@ app.post("/tts", async (req, res) => {
 
   try {
     console.log(`[TTS ${uniqueId}] Generating TTS...`);
-    await generateTtsWithFallback(text, localAudio, { voice, style, rate, pitch });
+    await generateTtsWithFallback(text, localAudio, { voice, style, rate, pitch, provider });
 
     const durationSec = await getAudioDuration(localAudio);
     const audioUrl = `${baseUrl}/temp/tts_${uniqueId}_voice.mp3`;
@@ -713,11 +748,12 @@ app.post("/generate/quranic", async (req, res) => {
     // Default to ur-PK-UzmaNeural for high quality Urdu voiceover
     const voice = req.body.voice || "ur-PK-UzmaNeural";
     const style = req.body.style || req.body.tone || "";
-    let rate = req.body.rate || req.body.speed || "0%";
+    const provider = req.body.provider || req.body.engine || "";
+    let rate = req.body.rate || req.body.speed || "-4%";
     let pitch = req.body.pitch || "0%";
 
-    console.log(`[Quranic ${uniqueId}] Generating Azure Urdu TTS with voice ${voice}...`);
-    await generateAzureTts(script, localAudio, { voice, style, rate, pitch });
+    console.log(`[Quranic ${uniqueId}] Generating TTS with voice ${voice}...`);
+    await generateTtsWithFallback(script, localAudio, { voice, style, rate, pitch, provider });
 
     const durationSec = await getAudioDuration(localAudio);
     const totalFrames = Math.max(120, Math.round((durationSec + 1.5) * 30));

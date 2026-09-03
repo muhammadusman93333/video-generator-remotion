@@ -37,6 +37,7 @@ export type PosVideoProps = {
   audioUrl: string;
   backgroundMusicUrl: string;
   text: string;
+  subtitles?: string;
   /** Flux/image prompt — metadata only. Remotion does not generate visuals from this. */
   prompt?: string;
   hookText?: string;
@@ -50,6 +51,7 @@ export const posVideoDefaultProps: PosVideoProps = {
   audioUrl: staticFile("voiceover/pos-video.mp3"),
   backgroundMusicUrl: staticFile("background-music.mp3"),
   text: "Kya aap thak chuke hain manual billing se?\nUPOS offers automated invoicing that saves you hours of stock tallying time every day at closing time!",
+  subtitles: "",
   prompt: "",
   hookText: "",
   bodyText: "",
@@ -434,6 +436,7 @@ export const PosVideo: React.FC<PosVideoProps> = ({
   audioUrl,
   backgroundMusicUrl,
   text,
+  subtitles,
   prompt: _prompt,
   hookText,
   bodyText,
@@ -444,7 +447,7 @@ export const PosVideo: React.FC<PosVideoProps> = ({
   // If hookText and bodyText are provided, use them as display subtitles.
   const lines = (hookText || bodyText)
     ? [hookText, bodyText].filter(Boolean) as string[]
-    : cleanDisplayLines(text);
+    : cleanDisplayLines(subtitles || text);
 
   // Generate 15 background particle keys
   const particles = Array.from({ length: 15 });
