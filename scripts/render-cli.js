@@ -140,12 +140,15 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
       return reject(writeErr);
     }
 
+    const rateValue = process.env.TTS_RATE || "-4%";
+    const rateFlag = `--rate="${rateValue}"`;
+
     const executeTts = (selectedVoice, callback) => {
       console.log(`[TTS] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
-      const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
-      const cmdPy = `python -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
-      const cmdPyWin = `py -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
-      const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" --rate "-4%"`.trim();
+      const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPy = `python -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPyWin = `py -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
 
       const candidateCmds = process.platform === "win32"
         ? [cmdEdgeTts, cmdPy, cmdPyWin]

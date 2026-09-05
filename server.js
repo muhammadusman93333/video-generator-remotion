@@ -158,7 +158,8 @@ function generateEdgeTts(text, outFile, options = {}) {
       return reject(writeErr);
     }
 
-    const rateFlag = `--rate "${options.rate || '-4%'}"`;
+    const rateValue = options.rate || "-4%";
+    const rateFlag = `--rate="${rateValue}"`;
 
     const executeTts = (selectedVoice, callback) => {
       console.log(`[TTS] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
