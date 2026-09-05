@@ -122,16 +122,24 @@ function convertCustomTagsToSsml(text) {
 
 function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
   return new Promise((resolve, reject) => {
-    let targetVoice = voice;
-    if (!targetVoice || targetVoice.includes("*") || targetVoice.trim() === "") {
-      targetVoice = "en-IN-NeerjaNeural";
-    }
-
     const cleanText = cleanVoiceText(text)
       .replace(/\[pause\]/gi, " ")
       .replace(/\[break\]/gi, " ")
       .replace(/\[strong\](.*?)\[\/strong\]/gi, "$1")
       .replace(/\[moderate\](.*?)\[\/moderate\]/gi, "$1");
+
+    const hasUrduCharacters = /[\u0600-\u06FF]/.test(cleanText);
+    let targetVoice = voice;
+    if (!targetVoice || targetVoice.includes("*") || targetVoice.trim() === "") {
+      targetVoice = hasUrduCharacters ? "ur-PK-AsadNeural" : "en-IN-NeerjaNeural";
+    }
+    targetVoice = targetVoice.replace(/^["']|["']$/g, "").trim();
+    if (hasUrduCharacters && targetVoice.startsWith("en-")) {
+      console.log(`[TTS] Urdu text detected. Switching voice from '${targetVoice}' to 'ur-PK-AsadNeural'`);
+      targetVoice = "ur-PK-AsadNeural";
+    }
+
+    const fallbackVoice = hasUrduCharacters ? "ur-PK-UzmaNeural" : "en-IN-NeerjaNeural";
 
     const tempTextFile = path.join(tempDir, `tts_cli_${Date.now()}_${Math.random().toString(36).substring(7)}.txt`);
     try {
@@ -143,6 +151,11 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
     const rateValue = process.env.TTS_RATE || "-4%";
     const rateFlag = `--rate="${rateValue}"`;
 
+    const execEnv = {
+      ...process.env,
+      PATH: process.env.PATH + (process.platform === "win32" ? "" : ":/home/runner/.local/bin:/root/.local/bin")
+    };
+
     const executeTts = (selectedVoice, callback) => {
       console.log(`[TTS] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
       const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
@@ -151,11 +164,11 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
       const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
 
       const candidateCmds = process.platform === "win32"
-        ? [cmdEdgeTts, cmdPy, cmdPyWin]
-        : [cmdEdgeTts, cmdPy3, cmdPy];
+        ? [cmdPy, cmdEdgeTts, cmdPyWin]
+        : [cmdPy3, cmdEdgeTts, cmdPy];
 
       const tryCommand = (cmd, nextCmds) => {
-        exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (err) => {
+        exec(cmd, { maxBuffer: 1024 * 1024 * 10, env: execEnv }, (err) => {
           if (!err && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
             return callback(null, outFile);
           }
@@ -167,12 +180,12 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
               ? "python -m pip install edge-tts"
               : "python3 -m pip install --break-system-packages edge-tts || pip install --break-system-packages edge-tts || python3 -m pip install edge-tts || pip install edge-tts";
 
-            exec(pipCmd, (installErr) => {
+            exec(pipCmd, { env: execEnv }, (installErr) => {
               if (installErr) {
                 return callback(installErr);
               }
               const retryPyCmd = process.platform === "win32" ? cmdPy : `${cmdPy3} || ${cmdPy}`;
-              exec(retryPyCmd, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
+              exec(retryPyCmd, { maxBuffer: 1024 * 1024 * 10, env: execEnv }, (retryErr) => {
                 if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
                   return callback(null, outFile);
                 }
@@ -187,17 +200,17 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
     };
 
     executeTts(targetVoice, (err, resFile) => {
-      safeUnlink(tempTextFile);
       if (!err && resFile) {
+        safeUnlink(tempTextFile);
         console.log(`[TTS] Edge-TTS generated successfully: ${resFile}`);
         return resolve(resFile);
       }
-      if (targetVoice !== "en-IN-NeerjaNeural") {
-        console.warn(`[TTS] Edge-TTS failed with voice '${targetVoice}'. Retrying with default 'en-IN-NeerjaNeural'...`);
-        executeTts("en-IN-NeerjaNeural", (retryErr, retryFile) => {
+      if (targetVoice !== fallbackVoice) {
+        console.warn(`[TTS] Edge-TTS failed with voice '${targetVoice}'. Retrying with fallback '${fallbackVoice}'...`);
+        executeTts(fallbackVoice, (retryErr, retryFile) => {
           safeUnlink(tempTextFile);
           if (!retryErr && retryFile) {
-            console.log(`[TTS] Edge-TTS generated successfully with default voice: ${retryFile}`);
+            console.log(`[TTS] Edge-TTS generated successfully with fallback voice: ${retryFile}`);
             return resolve(retryFile);
           }
           reject(new Error(`Edge-TTS fallback failed: ${retryErr ? retryErr.message : "Output file empty"}`));
