@@ -34,6 +34,14 @@ const renderDir = path.join(__dirname, "..", "renders");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 if (!fs.existsSync(renderDir)) fs.mkdirSync(renderDir, { recursive: true });
 
+function safeUnlink(...files) {
+  for (const file of files) {
+    try {
+      if (file && fs.existsSync(file)) fs.unlinkSync(file);
+    } catch (_) {}
+  }
+}
+
 function getFfprobePath() {
   return ffprobeInstaller.path;
 }
@@ -154,13 +162,14 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
             console.log("[TTS] Retrying with python pip install...");
             const pipCmd = process.platform === "win32"
               ? "python -m pip install edge-tts"
-              : "python3 -m pip install edge-tts || python -m pip install edge-tts";
+              : "python3 -m pip install --break-system-packages edge-tts || pip install --break-system-packages edge-tts || python3 -m pip install edge-tts || pip install edge-tts";
 
             exec(pipCmd, (installErr) => {
               if (installErr) {
                 return callback(installErr);
               }
-              exec(cmdPy, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
+              const retryPyCmd = process.platform === "win32" ? cmdPy : `${cmdPy3} || ${cmdPy}`;
+              exec(retryPyCmd, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
                 if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
                   return callback(null, outFile);
                 }
@@ -482,23 +491,13 @@ async function main() {
     await sendWebhook(videoUrl);
 
     // Cleanup temp files
-    try {
-      fs.unlinkSync(localImage);
-      fs.unlinkSync(localAudio);
-      fs.unlinkSync(propsFile);
-      fs.unlinkSync(finalVideo);
-    } catch (_) { }
+    safeUnlink(localImage, localAudio, propsFile, finalVideo);
 
     console.log("Process complete.");
   } catch (error) {
     console.error("Execution failed:", error);
     server.close();
-    try {
-      fs.unlinkSync(localImage);
-      fs.unlinkSync(localAudio);
-      fs.unlinkSync(propsFile);
-      fs.unlinkSync(finalVideo);
-    } catch (_) { }
+    safeUnlink(localImage, localAudio, propsFile, finalVideo);
     process.exit(1);
   }
 }

@@ -182,13 +182,14 @@ function generateEdgeTts(text, outFile, options = {}) {
             console.log("[TTS] Retrying with python pip install...");
             const pipCmd = process.platform === "win32"
               ? "python -m pip install edge-tts"
-              : "python3 -m pip install edge-tts || python -m pip install edge-tts";
+              : "python3 -m pip install --break-system-packages edge-tts || pip install --break-system-packages edge-tts || python3 -m pip install edge-tts || pip install edge-tts";
 
             exec(pipCmd, (installErr) => {
               if (installErr) {
                 return callback(installErr);
               }
-              exec(cmdPy, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
+              const retryPyCmd = process.platform === "win32" ? cmdPy : `${cmdPy3} || ${cmdPy}`;
+              exec(retryPyCmd, { maxBuffer: 1024 * 1024 * 10 }, (retryErr) => {
                 if (!retryErr && fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
                   return callback(null, outFile);
                 }
