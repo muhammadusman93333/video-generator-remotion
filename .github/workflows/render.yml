@@ -21,6 +21,9 @@ on:
       webhook_url:
         description: 'Optional webhook callback URL to send the generated video link'
         required: false
+      subtitles:
+        description: 'Optional display subtitles text (e.g. English subtitles while audio is Urdu)'
+        required: false
 
 jobs:
   render:
@@ -56,6 +59,10 @@ jobs:
             libcups2 \
             ffmpeg
 
+      - name: Install edge-tts
+        run: |
+          python3 -m pip install --break-system-packages edge-tts || pip install --break-system-packages edge-tts || true
+
       - name: Install project dependencies
         run: npm ci
 
@@ -71,6 +78,7 @@ jobs:
           WEBHOOK_URL: ${{ github.event.client_payload.webhook_url || inputs.webhook_url }}
           HOOK_TEXT: ${{ github.event.client_payload.hook_text || github.event.client_payload.hookText || github.event.client_payload.hook }}
           BODY_TEXT: ${{ github.event.client_payload.body_text || github.event.client_payload.bodyText || github.event.client_payload.body }}
+          SUBTITLES: ${{ github.event.client_payload.subtitles || github.event.client_payload.subtitle || inputs.subtitles }}
           THEME_COLOR: ${{ github.event.client_payload.theme_color || github.event.client_payload.themeColor || github.event.client_payload.color }}
           INDUSTRY: ${{ github.event.client_payload.industry }}
           LAYOUT_STYLE: ${{ toJson(github.event.client_payload.layoutStyle || github.event.client_payload.layout_style) }}
