@@ -32,12 +32,19 @@ const ease = Easing.bezier(0.16, 1, 0.3, 1);
 const FPS = 30;
 const END_PADDING_SECONDS = 1.2;
 
+export type CaptionCue = {
+  text: string;
+  startFrame: number;
+  endFrame: number;
+};
+
 export type PosVideoProps = {
   imageUrl: string;
   audioUrl: string;
   backgroundMusicUrl: string;
   text: string;
   subtitles?: string;
+  captions?: CaptionCue[];
   /** Flux/image prompt — metadata only. Remotion does not generate visuals from this. */
   prompt?: string;
   hookText?: string;
@@ -52,6 +59,7 @@ export const posVideoDefaultProps: PosVideoProps = {
   backgroundMusicUrl: staticFile("background-music.mp3"),
   text: "Kya aap thak chuke hain manual billing se?\nUPOS offers automated invoicing that saves you hours of stock tallying time every day at closing time!",
   subtitles: "",
+  captions: [],
   prompt: "",
   hookText: "",
   bodyText: "",
@@ -305,26 +313,80 @@ const parseRichText = (text: string, accentColor: string) => {
   });
 };
 
-const Subtitles: React.FC<{ lines: string[]; accentColor: string }> = ({ lines, accentColor }) => {
+const Subtitles: React.FC<{
+  lines: string[];
+  captions?: CaptionCue[];
+  accentColor: string;
+}> = ({ lines, captions, accentColor }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  
+
+  // 1. Frame-accurate timed captions from Edge-TTS timestamps
+  if (captions && captions.length > 0) {
+    const active = captions.find(
+      (item) => frame >= item.startFrame && frame < item.endFrame
+    );
+    if (!active) return null;
+
+    const local = frame - active.startFrame;
+    const opacity = interpolate(local, [0, 6], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: ease,
+    });
+    const scale = interpolate(local, [0, 6], [0.93, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.back(1.5)),
+    });
+
+    const isHook = captions.indexOf(active) === 0;
+
+    return (
+      <Interactive.Div
+        name="Subtitle"
+        style={{
+          width: 860,
+          background: "rgba(10, 25, 35, 0.45)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          border: `2.5px solid ${isHook ? accentColor : "rgba(255,255,255,0.15)"}`,
+          borderRadius: 24,
+          padding: "28px 36px",
+          color: isHook ? "#ffffff" : COLORS.text,
+          fontSize: isHook ? 45 : 38,
+          fontWeight: isHook ? 900 : 700,
+          lineHeight: 1.45,
+          textAlign: "center",
+          boxShadow: isHook
+            ? `0 12px 36px ${accentColor}33, inset 0 1px 0 rgba(255,255,255,0.2)`
+            : "0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)",
+          opacity,
+          transform: `scale(${scale})`,
+        }}
+      >
+        {parseRichText(active.text, accentColor)}
+      </Interactive.Div>
+    );
+  }
+
+  // 2. Zero-drift proportional fallback for lines
   if (lines.length === 0) return null;
   
   const usableFrames = Math.max(1, durationInFrames - Math.round(END_PADDING_SECONDS * FPS));
   const totalChars = lines.reduce((sum, line) => sum + line.length, 0) || 1;
   
-  let cursor = 0;
+  let charAcc = 0;
   const timed = lines.map((line) => {
-    const share = line.length / totalChars;
-    const duration = Math.max(45, Math.round(share * usableFrames));
-    const start = cursor;
-    const end = Math.min(usableFrames, start + duration);
-    cursor = end;
+    const start = Math.round((charAcc / totalChars) * usableFrames);
+    charAcc += line.length;
+    const end = Math.round((charAcc / totalChars) * usableFrames);
     return { line, start, end };
   });
   
-  timed[timed.length - 1].end = usableFrames;
+  if (timed.length > 0) {
+    timed[timed.length - 1].end = usableFrames;
+  }
   
   const active = timed.find((item) => frame >= item.start && frame < item.end);
   if (!active) return null;
@@ -437,6 +499,7 @@ export const PosVideo: React.FC<PosVideoProps> = ({
   backgroundMusicUrl,
   text,
   subtitles,
+  captions,
   prompt: _prompt,
   hookText,
   bodyText,
@@ -495,7 +558,7 @@ export const PosVideo: React.FC<PosVideoProps> = ({
       >
         <BrandHeader accentColor={accentColor} />
         <HeroImage imageUrl={imageUrl} accentColor={accentColor} />
-        <Subtitles lines={lines} accentColor={accentColor} />
+        <Subtitles lines={lines} captions={captions} accentColor={accentColor} />
         <Footer accentColor={accentColor} />
       </AbsoluteFill>
 

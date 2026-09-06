@@ -120,7 +120,102 @@ function convertCustomTagsToSsml(text) {
   return escaped;
 }
 
-function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
+function parseVtt(vttContent) {
+  if (!vttContent) return [];
+  const blocks = vttContent.trim().split(/\r?\n\r?\n/);
+  const cues = [];
+  for (const block of blocks) {
+    const lines = block.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/);
+      if (match) {
+        const start = parseInt(match[1], 10) * 3600 + parseInt(match[2], 10) * 60 + parseInt(match[3], 10) + parseInt(match[4], 10) / 1000;
+        const end = parseInt(match[5], 10) * 3600 + parseInt(match[6], 10) * 60 + parseInt(match[7], 10) + parseInt(match[8], 10) / 1000;
+        const text = lines.slice(i + 1).join(" ").trim();
+        cues.push({ start, end, text });
+        break;
+      }
+    }
+  }
+  return cues;
+}
+
+function buildCaptionCues(vttCues, subtitleText, totalDurationSec, fps = 30) {
+  const sentences = subtitleText
+    ? subtitleText
+        .replace(/\[pause\]/gi, "")
+        .replace(/\[break\]/gi, "")
+        .split(/(?<=[.?!])\s+|\r?\n+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  const cues = [];
+
+  function addChunks(text, startSec, endSec) {
+    if (!text) return;
+    const words = text.split(/\s+/).filter(Boolean);
+    const maxWords = 8;
+    if (words.length <= maxWords) {
+      cues.push({
+        text,
+        startFrame: Math.round(startSec * fps),
+        endFrame: Math.max(Math.round(startSec * fps) + 1, Math.round(endSec * fps)),
+      });
+      return;
+    }
+
+    const chunkCount = Math.ceil(words.length / maxWords);
+    const wordsPerChunk = Math.ceil(words.length / chunkCount);
+    const totalWords = words.length;
+    const dur = Math.max(0.1, endSec - startSec);
+
+    let wCursor = 0;
+    for (let c = 0; c < chunkCount; c++) {
+      const chunkWords = words.slice(wCursor, wCursor + wordsPerChunk);
+      if (chunkWords.length === 0) break;
+      const cStart = startSec + (wCursor / totalWords) * dur;
+      const cEnd = startSec + ((wCursor + chunkWords.length) / totalWords) * dur;
+      cues.push({
+        text: chunkWords.join(" "),
+        startFrame: Math.round(cStart * fps),
+        endFrame: Math.max(Math.round(cStart * fps) + 1, Math.round(cEnd * fps)),
+      });
+      wCursor += chunkWords.length;
+    }
+  }
+
+  if (vttCues && vttCues.length > 0 && sentences.length === vttCues.length) {
+    for (let i = 0; i < sentences.length; i++) {
+      addChunks(sentences[i], vttCues[i].start, vttCues[i].end);
+    }
+  } else if (vttCues && vttCues.length > 0 && sentences.length > 0) {
+    const speechStart = vttCues[0].start;
+    const speechEnd = vttCues[vttCues.length - 1].end;
+    const speechDur = Math.max(0.5, speechEnd - speechStart);
+    const totalChars = sentences.reduce((acc, s) => acc + s.length, 0) || 1;
+    let charAcc = 0;
+    for (const sent of sentences) {
+      const sStart = speechStart + (charAcc / totalChars) * speechDur;
+      const sEnd = speechStart + ((charAcc + sent.length) / totalChars) * speechDur;
+      addChunks(sent, sStart, sEnd);
+      charAcc += sent.length;
+    }
+  } else if (sentences.length > 0) {
+    const totalChars = sentences.reduce((acc, s) => acc + s.length, 0) || 1;
+    let charAcc = 0;
+    for (const sent of sentences) {
+      const sStart = (charAcc / totalChars) * totalDurationSec;
+      const sEnd = ((charAcc + sent.length) / totalChars) * totalDurationSec;
+      addChunks(sent, sStart, sEnd);
+      charAcc += sent.length;
+    }
+  }
+
+  return cues;
+}
+
+function generateEdgeTts(text, outFile, outVttFile, voice = AZURE_VOICE) {
   return new Promise((resolve, reject) => {
     const cleanText = cleanVoiceText(text)
       .replace(/\[pause\]/gi, " ")
@@ -150,6 +245,7 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
 
     const rateValue = process.env.TTS_RATE || "-4%";
     const rateFlag = `--rate="${rateValue}"`;
+    const vttFlag = outVttFile ? `--write-subtitles "${outVttFile}"` : "";
 
     const execEnv = {
       ...process.env,
@@ -158,10 +254,10 @@ function generateEdgeTts(text, outFile, voice = AZURE_VOICE) {
 
     const executeTts = (selectedVoice, callback) => {
       console.log(`[TTS] Requesting Edge-TTS (Voice: ${selectedVoice})...`);
-      const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
-      const cmdPy = `python -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
-      const cmdPyWin = `py -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
-      const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdEdgeTts = `edge-tts --file "${tempTextFile}" --write-media "${outFile}" ${vttFlag} --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPy = `python -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" ${vttFlag} --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPyWin = `py -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" ${vttFlag} --voice "${selectedVoice}" ${rateFlag}`.trim();
+      const cmdPy3 = `python3 -m edge_tts --file "${tempTextFile}" --write-media "${outFile}" ${vttFlag} --voice "${selectedVoice}" ${rateFlag}`.trim();
 
       const candidateCmds = process.platform === "win32"
         ? [cmdPy, cmdEdgeTts, cmdPyWin]
@@ -276,10 +372,10 @@ function generateAzureTts(text, outFile) {
   });
 }
 
-async function generateTtsWithFallback(text, outFile) {
+async function generateTtsWithFallback(text, outFile, outVttFile = null) {
   if (TTS_PROVIDER === "edge" || TTS_PROVIDER === "edge-tts") {
     console.log(`[TTS] Directly using Edge-TTS (Voice: ${AZURE_VOICE})...`);
-    return await generateEdgeTts(text, outFile);
+    return await generateEdgeTts(text, outFile, outVttFile);
   }
 
   if (AZURE_SPEECH_KEY) {
@@ -292,7 +388,7 @@ async function generateTtsWithFallback(text, outFile) {
   } else {
     console.log("No AZURE_SPEECH_KEY provided. Using Edge-TTS...");
   }
-  return await generateEdgeTts(text, outFile);
+  return await generateEdgeTts(text, outFile, outVttFile);
 }
 
 function runCommand(command) {
@@ -410,33 +506,21 @@ async function main() {
   const uniqueId = `github_${Date.now()}`;
   const localImage = path.join(tempDir, `${uniqueId}.jpeg`);
   const localAudio = path.join(tempDir, `${uniqueId}_voice.mp3`);
+  const localVtt = path.join(tempDir, `${uniqueId}_voice.vtt`);
   const propsFile = path.join(tempDir, `${uniqueId}_props.json`);
-  const finalVideo = path.join(renderDir, `video_${uniqueId}.mp4`);
+  const finalVideo = path.join(renderDir, `${uniqueId}.mp4`);
 
-  // Start a local HTTP server to serve the assets to Puppeteer/Remotion
-  const http = require("http");
-  const server = http.createServer((req, res) => {
-    const urlPath = decodeURIComponent(req.url.split("?")[0]);
-    let filePath = "";
+  // Start local HTTP static server so Remotion Puppeteer can fetch local images/audio reliably
+  const server = require("http").createServer((req, res) => {
+    let reqPath = decodeURI(req.url.split("?")[0]);
+    if (reqPath.startsWith("/")) reqPath = reqPath.slice(1);
+    const filePath = path.join(__dirname, "..", reqPath);
 
-    if (urlPath.startsWith("/temp/")) {
-      filePath = path.join(tempDir, urlPath.substring(6));
-    } else if (urlPath.startsWith("/public/")) {
-      filePath = path.join(__dirname, "..", "public", urlPath.substring(8));
-    } else {
-      filePath = path.join(__dirname, "..", urlPath);
-    }
-
-    fs.stat(filePath, (err, stats) => {
-      if (err || !stats.isFile()) {
+    fs.access(filePath, fs.constants.R_OK, (err) => {
+      if (err) {
         res.statusCode = 404;
-        res.end("Not Found");
-        return;
+        return res.end("Not found");
       }
-
-      res.statusCode = 200;
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
 
       if (filePath.endsWith(".mp3")) {
         res.setHeader("Content-Type", "audio/mpeg");
@@ -458,12 +542,26 @@ async function main() {
     console.log("Downloading image...");
     await downloadFile(IMAGE_URL, localImage);
 
-    await generateTtsWithFallback(SCRIPT, localAudio);
+    await generateTtsWithFallback(SCRIPT, localAudio, localVtt);
+
+    let vttCues = [];
+    if (fs.existsSync(localVtt) && fs.statSync(localVtt).size > 0) {
+      try {
+        const vttContent = fs.readFileSync(localVtt, "utf8");
+        vttCues = parseVtt(vttContent);
+        console.log(`[TTS] Extracted ${vttCues.length} speech timestamp cues from Edge-TTS`);
+      } catch (e) {
+        console.warn("[TTS] Could not parse VTT subtitles:", e.message);
+      }
+    }
 
     // Use local server port for duration query
     const localAudioUrl = `http://localhost:${PORT}/temp/${uniqueId}_voice.mp3`;
     const durationSec = await getAudioDuration(localAudio); // ffprobe can read file directly
     const totalFrames = Math.max(90, Math.round((durationSec + 1.2) * 30));
+
+    const captions = buildCaptionCues(vttCues, SUBTITLES || SCRIPT, durationSec, 30);
+    console.log(`[TTS] Prepared ${captions.length} timed subtitle cues for render`);
 
     // Map local files to HTTP localhost URLs for Puppeteer/Chrome to fetch successfully
     const props = {
@@ -472,6 +570,7 @@ async function main() {
       backgroundMusicUrl: BACKGROUND_MUSIC_URL || `http://localhost:${PORT}/public/background-music.mp3`,
       text: SCRIPT,
       subtitles: SUBTITLES || undefined,
+      captions: captions.length > 0 ? captions : undefined,
       prompt: "",
       hookText: HOOK_TEXT,
       bodyText: BODY_TEXT,
@@ -507,13 +606,13 @@ async function main() {
     await sendWebhook(videoUrl);
 
     // Cleanup temp files
-    safeUnlink(localImage, localAudio, propsFile, finalVideo);
+    safeUnlink(localImage, localAudio, localVtt, propsFile, finalVideo);
 
     console.log("Process complete.");
   } catch (error) {
     console.error("Execution failed:", error);
     server.close();
-    safeUnlink(localImage, localAudio, propsFile, finalVideo);
+    safeUnlink(localImage, localAudio, localVtt, propsFile, finalVideo);
     process.exit(1);
   }
 }

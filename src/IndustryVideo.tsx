@@ -56,12 +56,19 @@ export type LayoutStyle = {
   fontPair?: "outfit" | "lilita" | "poppins" | "inter";
 };
 
+export type CaptionCue = {
+  text: string;
+  startFrame: number;
+  endFrame: number;
+};
+
 export type IndustryVideoProps = {
   imageUrl: string;
   audioUrl: string;
   backgroundMusicUrl: string;
   text: string;
   subtitles?: string;
+  captions?: CaptionCue[];
   prompt?: string;
   hookText?: string;
   bodyText?: string;
@@ -76,6 +83,7 @@ export const industryVideoDefaultProps: IndustryVideoProps = {
   backgroundMusicUrl: staticFile("background-music.mp3"),
   text: "Restaurant billing me deri? [pause] U POS lagayein aur orders ko super-fast kitchen tak pahunchayein!",
   subtitles: "",
+  captions: [],
   prompt: "",
   hookText: "Restaurant billing me deri?",
   bodyText: "orders ko super-fast kitchen tak pahunchayein!",
@@ -684,33 +692,101 @@ const HookBanner: React.FC<{ hookText: string; accentColor: string; layoutStyle:
   );
 };
 
-const Subtitles: React.FC<{ lines: string[]; accentColor: string; category: string; layoutStyle: LayoutStyle }> = ({ lines, accentColor, category, layoutStyle }) => {
+const Subtitles: React.FC<{
+  lines: string[];
+  captions?: CaptionCue[];
+  accentColor: string;
+  category: string;
+  layoutStyle: LayoutStyle;
+}> = ({ lines, captions, accentColor, category, layoutStyle }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
+  const anim = layoutStyle.animationStyle || "spring";
+  const activeFont = getFontFamily(layoutStyle.fontPair || "lilita"); // default to lilita for captions
+
+  // 1. Frame-accurate timed captions from Edge-TTS timestamps (zero desync)
+  if (captions && captions.length > 0) {
+    const active = captions.find((item) => frame >= item.startFrame && frame < item.endFrame);
+    if (!active) return null;
+
+    const local = frame - active.startFrame;
+
+    let opacity = interpolate(local, [0, 6], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: ease,
+    });
+
+    let transform = "";
+    if (anim === "spring") {
+      const scale = interpolate(local, [0, 6], [0.94, 1], { extrapolateRight: "clamp", easing: Easing.out(Easing.back(1.5)) });
+      transform = `scale(${scale})`;
+    } else if (anim === "slideLeft") {
+      const slideX = interpolate(local, [0, 6], [-300, 0], { extrapolateRight: "clamp", easing: ease });
+      transform = `translateX(${slideX}px)`;
+    } else if (anim === "slideRight") {
+      const slideX = interpolate(local, [0, 6], [300, 0], { extrapolateRight: "clamp", easing: ease });
+      transform = `translateX(${slideX}px)`;
+    } else if (anim === "glitch") {
+      const shiftX = local < 4 ? (local % 2 === 0 ? -15 : 15) : 0;
+      transform = `translateX(${shiftX}px)`;
+    }
+
+    return (
+      <Interactive.Div
+        name="Subtitle"
+        style={{
+          width: 900,
+          background: "rgba(10, 14, 22, 0.65)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          border: `4px solid ${accentColor}`,
+          borderRadius: 28,
+          padding: "30px 40px",
+          color: "#ffffff",
+          fontFamily: activeFont,
+          textTransform: "uppercase",
+          letterSpacing: 1.5,
+          fontSize: 54,
+          fontWeight: 900,
+          lineHeight: 1.25,
+          textAlign: "center",
+          WebkitTextStroke: "3px #000000",
+          textShadow: "6px 6px 0px #000000",
+          opacity,
+          transform,
+          zIndex: 100,
+          translate: "0px -20.3px",
+        }}
+      >
+        {parseRichText(active.text, accentColor, category)}
+      </Interactive.Div>
+    );
+  }
+
+  // 2. Zero-drift proportional fallback for lines
   if (lines.length === 0) return null;
 
   const usableFrames = Math.max(1, durationInFrames - Math.round(END_PADDING_SECONDS * FPS));
   const totalChars = lines.reduce((sum, line) => sum + line.length, 0) || 1;
 
-  let cursor = 0;
+  let charAcc = 0;
   const timed = lines.map((line) => {
-    const share = line.length / totalChars;
-    const duration = Math.max(45, Math.round(share * usableFrames));
-    const start = cursor;
-    const end = Math.min(usableFrames, start + duration);
-    cursor = end;
+    const start = Math.round((charAcc / totalChars) * usableFrames);
+    charAcc += line.length;
+    const end = Math.round((charAcc / totalChars) * usableFrames);
     return { line, start, end };
   });
 
-  timed[timed.length - 1].end = usableFrames;
+  if (timed.length > 0) {
+    timed[timed.length - 1].end = usableFrames;
+  }
 
   const active = timed.find((item) => frame >= item.start && frame < item.end);
   if (!active) return null;
 
   const local = frame - active.start;
-  const anim = layoutStyle.animationStyle || "spring";
-  const activeFont = getFontFamily(layoutStyle.fontPair || "lilita"); // default to lilita for captions
 
   let opacity = interpolate(local, [0, 8], [0, 1], {
     extrapolateLeft: "clamp",
@@ -850,6 +926,7 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
   backgroundMusicUrl,
   text,
   subtitles,
+  captions,
   hookText,
   bodyText,
   themeColor,
@@ -925,7 +1002,7 @@ export const IndustryVideo: React.FC<IndustryVideoProps> = ({
 
         {/* Subtitles Section (above Footer) */}
         <div style={{ position: "absolute", bottom: 250, left: 0, right: 0, display: "flex", justifyContent: "center", zIndex: 8 }}>
-          <Subtitles lines={lines} accentColor={accentColor} category={category} layoutStyle={activeStyle} />
+          <Subtitles lines={lines} captions={captions} accentColor={accentColor} category={category} layoutStyle={activeStyle} />
         </div>
 
         {/* Bottom Section: Footer (CTA) */}
