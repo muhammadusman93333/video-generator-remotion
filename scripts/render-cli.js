@@ -411,23 +411,34 @@ async function uploadVideo(filePath) {
   form.append("video", fs.createReadStream(filePath));
 
   const headers = {
-    ...form.getHeaders()
+    ...form.getHeaders(),
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
   };
   if (process.env.API_BEARER_TOKEN) {
     headers["Authorization"] = `Bearer ${process.env.API_BEARER_TOKEN}`;
   }
 
   try {
-    const response = await axios.post(uploadUrl, form, { headers });
+    const response = await axios.post(uploadUrl, form, {
+      headers,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 300000,
+    });
     if (response.data && response.data.status === "success" && response.data.url) {
       return response.data.url;
     } else {
       throw new Error(`Upload failed: ${JSON.stringify(response.data)}`);
     }
   } catch (error) {
-    const errorMsg = error.response && error.response.data
-      ? JSON.stringify(error.response.data)
+    let errorMsg = error.response && error.response.data
+      ? (typeof error.response.data === "string" ? error.response.data : JSON.stringify(error.response.data))
       : error.message;
+    if (typeof errorMsg === "string" && (errorMsg.includes("Just a moment...") || errorMsg.includes("_cf_chl_opt") || errorMsg.includes("challenges.cloudflare.com"))) {
+      errorMsg = "Cloudflare Managed Challenge / Bot Protection intercepted the upload. Please disable 'Bot Fight Mode' or create a WAF Skip rule for /upload_media_api/ in your Cloudflare dashboard.";
+    }
     throw new Error(`Upload failed: ${errorMsg}`);
   }
 }

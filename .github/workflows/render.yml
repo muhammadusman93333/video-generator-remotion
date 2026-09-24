@@ -86,4 +86,5 @@ jobs:
           AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION || 'eastus' }}
           AZURE_VOICE: ${{ secrets.AZURE_VOICE || 'en-IN-NeerjaNeural' }}
           API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
+          UPLOAD_SERVER_URL: ${{ github.event.client_payload.upload_server_url || inputs.upload_server_url || 'https://uvisionpk.com/upload_media_api/upload_video.php' }}
         run: node scripts/render-cli.js
