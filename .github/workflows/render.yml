@@ -33,11 +33,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure Direct Origin Host
-        run: |
-          echo "84.235.255.27 uvisionpk.com new.uvisionpk.com" | sudo tee -a /etc/hosts
-          curl -s -I -k https://uvisionpk.com/upload_media_api/upload_video.php || true
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
